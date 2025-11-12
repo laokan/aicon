@@ -70,9 +70,6 @@
         @edit-project="handleEditProject"
         @delete-project="handleDeleteProject"
         @view-project="handleViewProject"
-        @download-project="handleDownloadProject"
-        @duplicate-project="handleDuplicateProject"
-        @archive-project="handleArchiveProject"
         @page-change="handlePageChange"
         @size-change="handleSizeChange"
         @row-click="handleRowClick"
@@ -319,37 +316,7 @@
     currentView.value = 'detail'
   }
 
-  const handleDownloadProject = async (project) => {
-    try {
-      await projectsStore.downloadProject(project.id)
-      ElMessage.success('文件下载已开始')
-    } catch (error) {
-      console.error('下载文件失败:', error)
-      ElMessage.error('下载文件失败')
-    }
-  }
-
-  const handleDuplicateProject = async (project) => {
-    try {
-      const newProject = await projectsStore.duplicateProject(project.id)
-      ElMessage.success('项目复制成功')
-      loadProjects()
-    } catch (error) {
-      console.error('复制项目失败:', error)
-      ElMessage.error('复制项目失败')
-    }
-  }
-
-  const handleArchiveProject = async (project) => {
-    try {
-      // 由于后端没有归档状态，暂时显示提示信息
-      ElMessage.info('归档功能即将上线，敬请期待')
-    } catch (error) {
-      console.error('归档项目失败:', error)
-      ElMessage.error('归档项目失败')
-    }
-  }
-
+  
   const handleReprocess = async (project) => {
     try {
       await projectsStore.reprocessProject(project.id)

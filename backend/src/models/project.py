@@ -4,9 +4,9 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Dict, Any, List
-from sqlalchemy import Column, String, Text, Integer, DateTime, ForeignKey, Index
-from sqlalchemy.orm import relationship
+from typing import Any, Dict
+
+from sqlalchemy import Column, DateTime, Index, Integer, String, Text
 
 from src.models.base import BaseModel
 
@@ -101,8 +101,8 @@ class Project(BaseModel):
     def can_be_processed(self) -> bool:
         """检查是否可以进行处理 - 按照data-model.md规范"""
         return (
-            self.status in [ProjectStatus.UPLOADED, ProjectStatus.FAILED] and
-            self.file_path and self.file_type in ["txt", "md", "docx", "epub"]
+                self.status in [ProjectStatus.UPLOADED, ProjectStatus.FAILED] and
+                self.file_path and self.file_type in ["txt", "md", "docx", "epub"]
         )
 
     @classmethod
@@ -130,9 +130,9 @@ class Project(BaseModel):
 
     @classmethod
     async def create_project(cls, db_session, owner_id: str, title: str,
-                           description: str = None, file_name: str = None,
-                           file_size: int = 0, file_type: str = "txt",
-                           file_path: str = "", file_hash: str = None):
+                             description: str = None, file_name: str = None,
+                             file_size: int = 0, file_type: str = "txt",
+                             file_path: str = "", file_hash: str = None):
         """创建新项目 - 按照data-model.md规范"""
         project = cls(
             owner_id=owner_id,

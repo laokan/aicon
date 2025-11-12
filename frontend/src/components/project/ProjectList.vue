@@ -2,11 +2,6 @@
   <div class="project-list">
     <!-- 视图切换栏 -->
     <div class="view-header">
-      <div class="header-left">
-        <span class="project-count">
-          共 {{ total }} 个项目
-        </span>
-      </div>
       <div class="header-right">
         <el-button-group>
           <el-button
@@ -54,10 +49,7 @@
         >
           <ProjectCard
             :project="project"
-            @edit="$emit('edit-project', $event)"
-            @delete="$emit('delete-project', $event)"
             @view="$emit('view-project', $event)"
-            @download="$emit('download-project', $event)"
           />
         </el-col>
       </el-row>
@@ -100,21 +92,28 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="file_processing_status" label="文件状态" width="100">
-          <template #default="{ row }">
-            <el-tag
-              :type="getFileStatusType(row.file_processing_status)"
-              size="small"
-              effect="plain"
-            >
-              {{ getFileStatusText(row.file_processing_status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
 
         <el-table-column prop="word_count" label="字数" width="100" align="right">
           <template #default="{ row }">
             <el-text>{{ formatNumber(row.word_count) }}</el-text>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="paragraph_count" label="段落" width="100" align="right">
+          <template #default="{ row }">
+            <el-text>{{ formatNumber(row.paragraph_count) }}</el-text>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="sentence_count" label="句子" width="100" align="right">
+          <template #default="{ row }">
+            <el-text>{{ formatNumber(row.sentence_count) }}</el-text>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="chapter_count" label="章节" width="100" align="right">
+          <template #default="{ row }">
+            <el-text>{{ formatNumber(row.chapter_count) }}</el-text>
           </template>
         </el-table-column>
 
@@ -136,61 +135,19 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button-group>
+            <div class="action-buttons">
               <el-button
                 type="primary"
                 size="small"
                 :icon="View"
+                link
                 @click.stop="$emit('view-project', row)"
               >
                 查看
               </el-button>
-              <el-button
-                type="default"
-                size="small"
-                :icon="Edit"
-                @click.stop="$emit('edit-project', row)"
-              >
-                编辑
-              </el-button>
-              <el-dropdown @command="handleCommand">
-                <el-button size="small" :icon="More">
-                  更多
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item
-                      :command="`download:${row.id}`"
-                      :icon="Download"
-                    >
-                      下载文件
-                    </el-dropdown-item>
-                    <el-dropdown-item
-                      :command="`duplicate:${row.id}`"
-                      :icon="CopyDocument"
-                    >
-                      复制项目
-                    </el-dropdown-item>
-                    <el-dropdown-item
-                      :command="`archive:${row.id}`"
-                      :icon="FolderOpened"
-                      :disabled="row.status === 'archived'"
-                    >
-                      {{ row.status === 'archived' ? '已归档' : '归档' }}
-                    </el-dropdown-item>
-                    <el-dropdown-item
-                      :command="`delete:${row.id}`"
-                      :icon="Delete"
-                      divided
-                    >
-                      删除项目
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </el-button-group>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -221,12 +178,6 @@ import {
   Grid,
   List,
   View,
-  Edit,
-  Download,
-  Delete,
-  More,
-  CopyDocument,
-  FolderOpened,
 } from '@element-plus/icons-vue'
 import ProjectCard from './ProjectCard.vue'
 
@@ -256,12 +207,7 @@ const props = defineProps({
 
 // Emits定义
 const emit = defineEmits([
-  'edit-project',
-  'delete-project',
   'view-project',
-  'download-project',
-  'duplicate-project',
-  'archive-project',
   'page-change',
   'size-change',
   'row-click',
@@ -284,117 +230,28 @@ const handleRowClick = (row) => {
   emit('row-click', row)
 }
 
-const handleCommand = async (command) => {
-  const [action, projectId] = command.split(':')
-
-  switch (action) {
-    case 'download':
-      emit('download-project', projectId)
-      break
-    case 'duplicate':
-      await handleDuplicateProject(projectId)
-      break
-    case 'archive':
-      await handleArchiveProject(projectId)
-      break
-    case 'delete':
-      await handleDeleteProject(projectId)
-      break
-  }
-}
-
-const handleDuplicateProject = async (projectId) => {
-  try {
-    const project = props.projects.find((p) => p.id === projectId)
-    if (!project) return
-
-    const { value: confirmed } = await ElMessageBox.confirm(
-      `确定要复制项目 "${project.title}" 吗？`,
-      '确认复制',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'info',
-      }
-    )
-
-    if (confirmed) {
-      emit('duplicate-project', projectId)
-      ElMessage.success('项目复制成功')
-    }
-  } catch (error) {
-    // 用户取消操作
-  }
-}
-
-const handleArchiveProject = async (projectId) => {
-  try {
-    const project = props.projects.find((p) => p.id === projectId)
-    if (!project) return
-
-    const { value: confirmed } = await ElMessageBox.confirm(
-      `确定要${project.status === 'archived' ? '取消归档' : '归档'}项目 "${project.title}" 吗？`,
-      '确认操作',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
-      }
-    )
-
-    if (confirmed) {
-      emit('archive-project', projectId)
-      ElMessage.success(project.status === 'archived' ? '项目已取消归档' : '项目已归档')
-    }
-  } catch (error) {
-    // 用户取消操作
-  }
-}
-
-const handleDeleteProject = async (projectId) => {
-  try {
-    const project = props.projects.find((p) => p.id === projectId)
-    if (!project) return
-
-    const { value: confirmed } = await ElMessageBox.confirm(
-      `确定要删除项目 "${project.title}" 吗？此操作不可恢复。`,
-      '确认删除',
-      {
-        confirmButtonText: '确定删除',
-        cancelButtonText: '取消',
-        type: 'error',
-        confirmButtonClass: 'el-button--danger',
-      }
-    )
-
-    if (confirmed) {
-      emit('delete-project', projectId)
-      ElMessage.success('项目删除成功')
-    }
-  } catch (error) {
-    // 用户取消操作
-  }
-}
 
 // 工具方法
 const getStatusType = (status) => {
   const typeMap = {
-    draft: 'info',
-    processing: 'warning',
+    uploaded: 'info',
+    parsing: 'warning',
+    parsed: 'success',
+    generating: 'warning',
     completed: 'success',
-    failed: 'danger',
-    archived: 'info',
+    failed: 'danger'
   }
   return typeMap[status] || 'info'
 }
 
 const getStatusText = (status) => {
   const textMap = {
-    draft: '草稿',
-    processing: '处理中',
+    uploaded: '已上传',
+    parsing: '解析中',
+    parsed: '解析完成',
+    generating: '生成中',
     completed: '已完成',
-    failed: '失败',
-    archived: '已归档',
+    failed: '失败'
   }
   return textMap[status] || status
 }
@@ -457,6 +314,7 @@ defineExpose({
 <style scoped>
 .project-list {
   width: 100%;
+  padding: var(--space-md);
 }
 
 .view-header {
@@ -464,7 +322,7 @@ defineExpose({
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--space-lg);
-  padding: 0 var(--space-sm);
+  padding: 0;
 }
 
 .header-left {
@@ -510,10 +368,11 @@ defineExpose({
 .grid-view {
   width: 100%;
   overflow: visible; /* 确保内容不被裁剪 */
+  padding: var(--space-lg) 0;
 }
 
 .grid-view .el-col {
-  padding: var(--space-md);
+  padding: var(--space-lg);
 }
 
 /* Element Plus Row 组件可能需要的额外样式 */
@@ -543,30 +402,49 @@ defineExpose({
   border: 1px solid var(--border-primary);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
+  padding: var(--space-lg);
 }
 
 :deep(.el-table) {
   --el-table-border-color: var(--border-primary);
   --el-table-header-bg-color: var(--bg-secondary);
-  --el-table-row-hover-bg-color: rgba(99, 102, 241, 0.05);
+  --el-table-row-hover-bg-color: rgba(99, 102, 241, 0.03);
   --el-table-text-color: var(--text-primary);
   --el-table-header-text-color: var(--text-primary);
+  font-size: var(--text-sm);
 }
 
 :deep(.el-table th) {
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-sm);
-  background: var(--bg-secondary);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
   border-bottom: 2px solid var(--border-primary);
+  padding: var(--space-md) var(--space-sm);
+  color: var(--text-primary);
 }
 
 :deep(.el-table td) {
   border-bottom: 1px solid var(--border-primary);
-  padding: var(--space-md) var(--space-sm);
+  padding: var(--space-lg) var(--space-sm);
+  vertical-align: middle;
 }
 
 :deep(.el-table--striped .el-table__body tr.el-table__row--striped td) {
-  background: var(--bg-secondary);
+  background: rgba(99, 102, 241, 0.02);
+}
+
+:deep(.el-table__body tr:hover > td) {
+  background: rgba(99, 102, 241, 0.03) !important;
+}
+
+/* 表格行悬停效果 */
+:deep(.el-table__row) {
+  transition: all var(--transition-fast);
+}
+
+:deep(.el-table__row:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1);
 }
 
 .project-title {
@@ -580,6 +458,34 @@ defineExpose({
   min-width: 0;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+/* 操作按钮样式 */
+.action-buttons {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.action-buttons :deep(.el-button--link) {
+  padding: var(--space-xs) var(--space-sm);
+  margin: 0;
+  min-height: auto;
+  border: none;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.action-buttons :deep(.el-button--link:hover) {
+  transform: translateY(-1px);
+  background: rgba(99, 102, 241, 0.05);
+  border-radius: var(--radius-md);
+}
+
+.action-buttons :deep(.el-button--danger.is-link:hover) {
+  background: rgba(245, 108, 108, 0.05);
+  color: var(--danger-color);
 }
 
 /* 分页样式优化 */
@@ -687,6 +593,10 @@ defineExpose({
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+  .project-list {
+    padding: var(--space-sm);
+  }
+
   .view-header {
     flex-direction: column;
     align-items: flex-start;
@@ -717,6 +627,10 @@ defineExpose({
     padding: var(--space-lg) var(--space-md);
   }
 
+  .list-view {
+    padding: var(--space-md);
+  }
+
   :deep(.el-table) {
     font-size: var(--text-sm);
   }
@@ -738,6 +652,10 @@ defineExpose({
 }
 
 @media (max-width: 480px) {
+  .project-list {
+    padding: var(--space-xs);
+  }
+
   .view-header {
     gap: var(--space-sm);
   }
@@ -765,6 +683,22 @@ defineExpose({
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-xs);
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    gap: var(--space-xs);
+    align-items: flex-end;
+  }
+
+  .action-buttons :deep(.el-button--link) {
+    padding: var(--space-xs) var(--space-xs);
+    font-size: var(--text-xs);
+    min-width: auto;
+  }
+
+  .list-view {
+    padding: var(--space-sm);
   }
 }
 

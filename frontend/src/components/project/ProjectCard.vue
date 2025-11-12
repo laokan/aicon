@@ -7,40 +7,6 @@
           <component :is="getFileTypeIcon(project.file_type)" />
         </el-icon>
       </div>
-
-      <div class="card-actions">
-        <el-dropdown @command="handleCommand" trigger="click" @click.stop>
-          <el-button type="text" size="small" :icon="More" />
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item :command="`view:${project.id}`" :icon="View">
-                查看详情
-              </el-dropdown-item>
-              <el-dropdown-item :command="`edit:${project.id}`" :icon="Edit">
-                编辑项目
-              </el-dropdown-item>
-              <el-dropdown-item :command="`download:${project.id}`" :icon="Download">
-                下载文件
-              </el-dropdown-item>
-              <el-dropdown-item :command="`duplicate:${project.id}`" :icon="CopyDocument">
-                复制项目
-              </el-dropdown-item>
-              <!-- 归档功能暂未实现 -->
-              <el-dropdown-item :command="`archive:${project.id}`" :icon="FolderOpened" disabled>
-                归档项目
-              </el-dropdown-item>
-              <el-dropdown-item
-                :command="`delete:${project.id}`"
-                :icon="Delete"
-                divided
-                danger
-              >
-                删除项目
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-      </div>
     </div>
 
     <!-- 卡片内容 -->
@@ -78,7 +44,11 @@
           <el-text size="small">{{ formatNumber(project.paragraph_count) }}</el-text>
           <el-text size="small" type="info">段落</el-text>
         </div>
-        <div class="stat-item" v-if="project.chapter_count > 0">
+        <div class="stat-item">
+          <el-text size="small">{{ formatNumber(project.sentence_count) }}</el-text>
+          <el-text size="small" type="info">句子</el-text>
+        </div>
+        <div class="stat-item">
           <el-text size="small">{{ formatNumber(project.chapter_count) }}</el-text>
           <el-text size="small" type="info">章节</el-text>
         </div>
@@ -118,22 +88,6 @@
           更新于 {{ formatDateTime(project.updated_at) }}
         </el-text>
       </div>
-
-      <div class="action-buttons">
-        <el-button
-          type="primary"
-          size="small"
-          @click.stop="$emit('view', project)"
-        >
-          查看
-        </el-button>
-        <el-button
-          size="small"
-          @click.stop="$emit('edit', project)"
-        >
-          编辑
-        </el-button>
-      </div>
     </div>
   </div>
 </template>
@@ -141,13 +95,6 @@
 <script setup>
 import { computed } from 'vue'
 import {
-  View,
-  Edit,
-  Download,
-  Delete,
-  More,
-  CopyDocument,
-  FolderOpened,
   Document,
   VideoPlay,
   Microphone,
@@ -164,12 +111,7 @@ const props = defineProps({
 
 // Emits定义
 const emit = defineEmits([
-  'view',
-  'edit',
-  'delete',
-  'download',
-  'duplicate',
-  'archive'
+  'view'
 ])
 
 // 计算属性
@@ -212,31 +154,6 @@ const getFileTypeText = (fileType) => {
   return textMap[fileType] || '未知'
 }
 
-// 方法
-const handleCommand = (command) => {
-  const [action, projectId] = command.split(':')
-
-  switch (action) {
-    case 'view':
-      emit('view', props.project)
-      break
-    case 'edit':
-      emit('edit', props.project)
-      break
-    case 'download':
-      emit('download', props.project)
-      break
-    case 'duplicate':
-      emit('duplicate', props.project)
-      break
-    case 'archive':
-      emit('archive', props.project)
-      break
-    case 'delete':
-      emit('delete', props.project)
-      break
-  }
-}
 
 const getStatusType = (status) => {
   const typeMap = {
@@ -340,7 +257,7 @@ const formatDateTime = (dateTime) => {
 .card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: var(--space-lg) var(--space-lg) var(--space-md);
 }
 
@@ -373,14 +290,6 @@ const formatDateTime = (dateTime) => {
   50% { transform: scale(1.2); opacity: 0.8; }
 }
 
-.card-actions {
-  opacity: 0;
-  transition: opacity var(--transition-base);
-}
-
-.project-card:hover .card-actions {
-  opacity: 1;
-}
 
 .card-content {
   flex: 1;
@@ -437,7 +346,7 @@ const formatDateTime = (dateTime) => {
 
 .stats-info {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--space-sm);
   padding: var(--space-sm);
   background: var(--bg-secondary);
@@ -496,47 +405,11 @@ const formatDateTime = (dateTime) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-md);
 }
 
 .time-info .el-text {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
-}
-
-.action-buttons {
-  display: flex;
-  gap: var(--space-sm);
-  justify-content: space-between;
-}
-
-.action-buttons .el-button {
-  flex: 1;
-  border-radius: var(--radius-lg);
-  font-weight: 600;
-  font-size: var(--text-sm);
-  transition: all var(--transition-base);
-}
-
-.action-buttons .el-button--primary {
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-  border: none;
-  box-shadow: var(--shadow-sm);
-}
-
-.action-buttons .el-button--primary:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-.action-buttons .el-button--default {
-  border-color: var(--border-primary);
-  background: var(--bg-secondary);
-}
-
-.action-buttons .el-button--default:hover {
-  border-color: var(--primary-color);
-  background: rgba(99, 102, 241, 0.05);
 }
 
 /* 深色主题适配 */
@@ -575,17 +448,12 @@ const formatDateTime = (dateTime) => {
 
   .stats-info {
     grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-sm);
-    padding: var(--space-sm);
+    gap: var(--space-xs);
+    padding: var(--space-xs);
   }
 
   .project-title {
     font-size: var(--text-base);
-  }
-
-  .action-buttons {
-    flex-direction: column;
-    gap: var(--space-xs);
   }
 }
 </style>

@@ -21,57 +21,7 @@
           </div>
         </div>
 
-        <div class="header-actions">
-          <el-button-group>
-            <el-button
-              :icon="Edit"
-              @click="handleEdit"
-            >
-              编辑
-            </el-button>
-            <el-button
-              :icon="Download"
-              @click="handleDownload"
-            >
-              下载
-            </el-button>
-            <el-dropdown @command="handleCommand">
-              <el-button :icon="More">
-                更多
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item
-                    :command="`duplicate:${project.id}`"
-                    :icon="CopyDocument"
-                  >
-                    复制项目
-                  </el-dropdown-item>
-                  <el-dropdown-item
-                    :command="`archive:${project.id}`"
-                    :icon="FolderOpened"
-                    :disabled="project.status === 'archived'"
-                  >
-                    {{ project.status === 'archived' ? '已归档' : '归档' }}
-                  </el-dropdown-item>
-                  <!-- 重新处理功能暂未实现 -->
-                  <el-dropdown-item :command="`reprocess:${project.id}`" :icon="Refresh" disabled>
-                    重新处理
-                  </el-dropdown-item>
-                  <el-dropdown-item
-                    :command="`delete:${project.id}`"
-                    :icon="Delete"
-                    divided
-                    danger
-                  >
-                    删除项目
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </el-button-group>
         </div>
-      </div>
 
       <!-- 项目基本信息 -->
       <el-card class="info-card">
@@ -139,7 +89,7 @@
                     <div class="stat-label">句子数</div>
                   </div>
                 </el-col>
-                <el-col :span="6" v-if="project.chapter_count > 0">
+                <el-col :span="6">
                   <div class="stat-item">
                     <div class="stat-value">{{ formatNumber(project.chapter_count) }}</div>
                     <div class="stat-label">章节数</div>
@@ -241,13 +191,6 @@ import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
-  Edit,
-  Download,
-  Delete,
-  More,
-  CopyDocument,
-  FolderOpened,
-  Refresh,
   VideoPlay,
   Document
 } from '@element-plus/icons-vue'
@@ -275,12 +218,6 @@ const props = defineProps({
 // Emits定义
 const emit = defineEmits([
   'back',
-  'edit',
-  'delete',
-  'download',
-  'duplicate',
-  'archive',
-  'reprocess',
   'refresh',
   'start-generation',
   'view-content'
@@ -294,117 +231,6 @@ const handleBack = () => {
   emit('back')
 }
 
-const handleEdit = () => {
-  emit('edit', props.project)
-}
-
-const handleDownload = () => {
-  emit('download', props.project)
-}
-
-const handleCommand = async (command) => {
-  const [action, projectId] = command.split(':')
-
-  switch (action) {
-    case 'duplicate':
-      await handleDuplicate()
-      break
-    case 'archive':
-      await handleArchive()
-      break
-    case 'reprocess':
-      await handleReprocess()
-      break
-    case 'delete':
-      await handleDelete()
-      break
-  }
-}
-
-const handleDuplicate = async () => {
-  try {
-    const { value: confirmed } = await ElMessageBox.confirm(
-      `确定要复制项目 "${props.project.title}" 吗？`,
-      '确认复制',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'info'
-      }
-    )
-
-    if (confirmed) {
-      emit('duplicate', props.project)
-      ElMessage.success('项目复制请求已发送')
-    }
-  } catch (error) {
-    // 用户取消操作
-  }
-}
-
-const handleArchive = async () => {
-  try {
-    const { value: confirmed } = await ElMessageBox.confirm(
-      `确定要${props.project.status === 'archived' ? '取消归档' : '归档'}项目 "${props.project.title}" 吗？`,
-      '确认操作',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-
-    if (confirmed) {
-      emit('archive', props.project)
-      ElMessage.success(props.project.status === 'archived' ? '取消归档成功' : '归档成功')
-    }
-  } catch (error) {
-    // 用户取消操作
-  }
-}
-
-const handleReprocess = async () => {
-  try {
-    const { value: confirmed } = await ElMessageBox.confirm(
-      `确定要重新处理项目 "${props.project.title}" 的文件吗？`,
-      '确认重新处理',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-
-    if (confirmed) {
-      emit('reprocess', props.project)
-      ElMessage.success('重新处理请求已发送')
-    }
-  } catch (error) {
-    // 用户取消操作
-  }
-}
-
-const handleDelete = async () => {
-  try {
-    const { value: confirmed } = await ElMessageBox.confirm(
-      `确定要删除项目 "${props.project.title}" 吗？此操作不可恢复。`,
-      '确认删除',
-      {
-        confirmButtonText: '确定删除',
-        cancelButtonText: '取消',
-        type: 'error',
-        confirmButtonClass: 'el-button--danger'
-      }
-    )
-
-    if (confirmed) {
-      emit('delete', props.project)
-      ElMessage.success('项目删除成功')
-    }
-  } catch (error) {
-    // 用户取消操作
-  }
-}
 
 const handleStartGeneration = () => {
   if (!['completed', 'parsed'].includes(props.project.status)) {
