@@ -150,14 +150,13 @@
 <script setup>
   import { computed, onMounted, ref, watch } from 'vue'
   import { ElMessage, ElMessageBox } from 'element-plus'
-  import { ArrowLeft, Plus, Refresh, House, Folder, Search } from '@element-plus/icons-vue'
+  import { Plus, Refresh, House, Folder, Search } from '@element-plus/icons-vue'
 
   // 组件导入
   import PageNavigation from '@/components/common/PageNavigation.vue'
   import ProjectList from '@/components/project/ProjectList.vue'
   import ProjectDetail from '@/components/project/ProjectDetail.vue'
   import ProjectCreator from '@/components/project/ProjectCreator.vue'
-  import { uploadService } from '@/services/upload'
 
   // 状态管理导入
   import { useProjectsStore } from '@/stores/projects'
@@ -461,19 +460,8 @@
     try {
       creatorLoading.value = true
 
-      // 创建FormData用于文件上传
-      const formData = new FormData()
-      formData.append('file', creatorData.file)
-      formData.append('title', creatorData.title)
-      if (creatorData.description) {
-        formData.append('description', creatorData.description)
-      }
-      formData.append('auto_process', creatorData.auto_process)
-
-      // 调用上传API
-      const response = await uploadService.uploadFile({ formData })
-
-      ElMessage.success('项目创建成功')
+      // ProjectCreator 组件已经处理了文件上传和项目创建，并显示了成功消息
+      // 这里只需要处理成功后的UI更新
       showCreatorDialog.value = false
       loadProjects()
 
