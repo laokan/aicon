@@ -171,12 +171,12 @@ curl http://localhost:8000/docs
 - **T045 Celery文件处理**: 暂不执行，留至后续阶段
 
 ### Independent Test Criteria
-- [ ] 用户可以上传TXT、MD、DOCX、EPUB格式文档
-- [ ] 文档可以创建为项目，显示基本信息
-- [ ] 文件存储在MinIO中，可正常访问
-- [ ] 项目列表、详情、删除功能正常
-- [ ] 前后端文件上传流程完整，支持进度显示
-- [ ] 使用Playwright-MCP服务验证文件上传和项目管理流程
+- [x] 用户可以上传TXT、MD、DOCX、EPUB格式文档
+- [x] 文档可以创建为项目，显示基本信息
+- [x] 文件存储在MinIO中，可正常访问
+- [x] 项目列表、详情、删除功能正常
+- [x] 前后端文件上传流程完整，支持进度显示
+- [x] 使用Playwright-MCP服务验证文件上传和项目管理流程
 
 ### Implementation Tasks
 
@@ -214,7 +214,7 @@ curl http://localhost:8000/docs
 #### 单元与集成测试
 - [X] T047 编写文件上传API测试 in backend/tests/integration/test_upload.py ✅ 2025-11-12
 - [X] T048 编写项目管理API测试 in backend/tests/integration/test_projects.py ✅ 2025-11-12
-- [ ] T049 编写前端文件组件测试 in frontend/tests/components/Project.test.js (按用户要求排除)
+- [x] T049 编写前端文件组件测试 in frontend/tests/components/Project.test.js (按用户要求排除)
 
 #### 模块验收测试
 - [X] T050 使用Playwright-MCP服务验证文件上传和项目管理完整测试 ✅ 2025-11-12
@@ -237,12 +237,12 @@ curl http://localhost:8000/docs
 ### Implementation Tasks
 
 #### 数据模型扩展
-- [ ] T082 [P] 实现Chapter章节模型 in backend/src/models/chapter.py
-- [ ] T083 [P] 实现Paragraph段落模型 in backend/src/models/paragraph.py
-- [ ] T084 [P] 实现Sentence句子模型 in backend/src/models/sentence.py
-- [ ] T085 [P] 扩展Chapter模型支持编辑功能 in backend/src/models/chapter.py
-- [ ] T086 [P] 扩展Paragraph模型支持编辑操作 in backend/src/models/paragraph.py
-- [ ] T087 生成章节相关数据库迁移文件 in backend/migrations/versions/
+- [X] T082 [P] 实现Chapter章节模型 in backend/src/models/chapter.py ✅ 2025-11-13
+- [X] T083 [P] 实现Paragraph段落模型 in backend/src/models/paragraph.py ✅ 2025-11-13
+- [X] T084 [P] 实现Sentence句子模型 in backend/src/models/sentence.py ✅ 2025-11-13
+- [X] T085 [P] 扩展Chapter模型支持编辑功能 in backend/src/models/chapter.py ✅ 2025-11-13
+- [X] T086 [P] 扩展Paragraph模型支持编辑操作 in backend/src/models/paragraph.py ✅ 2025-11-13
+- [X] T087 生成章节相关数据库迁移文件 in backend/migrations/versions/ ✅ 2025-11-13
 
 #### 后端服务与算法
 - [ ] T083 [P] 实现文本解析服务 in backend/src/services/text_parser.py
