@@ -132,7 +132,7 @@ const handleLogin = async () => {
   font-size: 24px;
   color: var(--primary-color);
   padding: var(--space-sm);
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(32, 33, 36, 0.1);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
@@ -176,7 +176,7 @@ const handleLogin = async () => {
 
 :deep(.el-input__wrapper.is-focus) {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 4px rgba(32, 33, 36, 0.1);
 }
 
 :deep(.el-input__inner) {
@@ -209,7 +209,7 @@ const handleLogin = async () => {
 
 .submit-button:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-lg), 0 10px 25px rgba(99, 102, 241, 0.3);
+  box-shadow: var(--shadow-lg), 0 10px 25px rgba(32, 33, 36, 0.3);
 }
 
 .submit-button:active {

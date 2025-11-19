@@ -524,9 +524,9 @@ const handleBack = () => {
 
   // 返回到项目详情页面
   const targetRoute = `/projects/${projectId.value}`
-  console.log('正在返回项目详情页面:', targetRoute)
+
   router.push(targetRoute).then(() => {
-    console.log('返回项目详情页面成功')
+
   }).catch((error) => {
     console.error('返回项目详情页面失败:', error)
     ElMessage.error('返回项目详情页面失败，请手动导航')
@@ -691,53 +691,6 @@ onMounted(async () => {
 .header-actions .el-button {
   border-radius: var(--radius-lg);
   font-weight: 600;
-  padding: var(--space-md) var(--space-lg);
-  min-width: 120px;
-  transition: all var(--transition-base);
-}
-
-.header-actions .el-button--primary {
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
-  border: none;
-  box-shadow: var(--shadow-md);
-}
-
-.header-actions .el-button--primary:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-
-/* 卡片样式 */
-:deep(.el-card) {
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-primary);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
-}
-
-:deep(.el-card__header) {
-  padding: var(--space-xl);
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.02), rgba(139, 92, 246, 0.02));
-  border-bottom: 1px solid var(--border-primary);
-}
-
-:deep(.el-card__body) {
-  padding: var(--space-xl);
-}
-
-/* 用户引导 */
-.guidance-section {
-  width: 100%;
-}
-
-.guidance-card {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05));
-  border: 1px solid rgba(99, 102, 241, 0.2);
-}
-
-.guidance-content {
-  display: flex;
-  align-items: center;
   gap: var(--space-xl);
   padding: var(--space-xl);
 }

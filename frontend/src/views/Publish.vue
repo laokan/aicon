@@ -145,64 +145,64 @@ const resetPublish = () => {
 .publish-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xl);
+  gap: 40px;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
 }
 
-/* page-header样式使用全局main.css中的优化样式 */
-
 .publish-content {
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border-radius: var(--radius-xl);
-  border: 1px solid var(--border-primary);
-  padding: var(--space-2xl);
-  box-shadow: var(--shadow-lg);
+  padding: 40px;
+  box-shadow: var(--shadow-sm);
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
 }
 
 .publish-steps {
-  margin-bottom: var(--space-2xl);
-}
-
-:deep(.el-steps) {
-  margin-bottom: var(--space-xl);
+  margin-bottom: 60px;
+  padding: 0 40px;
 }
 
 :deep(.el-step__title) {
-  font-size: var(--text-sm);
+  font-size: 14px;
   font-weight: 600;
+  margin-top: 8px;
 }
 
 :deep(.el-step__description) {
-  font-size: var(--text-xs);
+  font-size: 12px;
   color: var(--text-secondary);
-  margin-top: var(--space-xs);
+  margin-top: 4px;
 }
 
 .publish-form {
-  min-height: 400px;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
 }
 
 .step-content {
-  background: var(--bg-primary);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-primary);
-  padding: var(--space-xl);
-  margin-bottom: var(--space-xl);
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .step-header {
   text-align: center;
-  margin-bottom: var(--space-2xl);
+  margin-bottom: 40px;
 }
 
 .step-header h3 {
-  font-size: var(--text-xl);
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 var(--space-sm) 0;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
 }
 
 .step-header p {
-  font-size: var(--text-base);
+  font-size: 16px;
   color: var(--text-secondary);
   margin: 0;
 }
@@ -213,66 +213,57 @@ const resetPublish = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 200px;
-  padding: var(--space-2xl);
+  min-height: 300px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-primary);
+  margin-bottom: 40px;
+  transition: all 0.3s ease;
+}
+
+.content-selection:hover,
+.platform-config:hover,
+.content-preview:hover {
+  border-color: var(--primary-color);
+  background: var(--bg-primary);
 }
 
 .step-actions {
   display: flex;
   justify-content: center;
-  gap: var(--space-md);
+  gap: 20px;
+  margin-top: auto;
+  padding-top: 20px;
+}
+
+.step-actions .el-button {
+  min-width: 120px;
+  height: 40px;
+  font-weight: 500;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
   .publish-content {
-    padding: var(--space-lg);
-    border-radius: var(--radius-lg);
+    padding: 20px;
   }
 
-  .step-content {
-    padding: var(--space-lg);
-  }
-
-  :deep(.el-steps) {
-    --el-step-icon-size: 32px;
+  .publish-steps {
+    padding: 0;
+    margin-bottom: 40px;
   }
 
   :deep(.el-step__title) {
-    font-size: var(--text-xs);
-  }
-
-  .step-actions {
-    flex-direction: column;
-  }
-
-  .step-actions .el-button {
-    width: 100%;
-  }
-}
-
-@media (max-width: 480px) {
-  .publish-content {
-    padding: var(--space-md);
-  }
-
-  .step-content {
-    padding: var(--space-md);
-  }
-
-  .step-header {
-    margin-bottom: var(--space-lg);
+    font-size: 12px;
   }
 
   .step-header h3 {
-    font-size: var(--text-lg);
-  }
-
-  .content-selection,
-  .platform-config,
-  .content-preview {
-    padding: var(--space-lg);
-    min-height: 150px;
+    font-size: 20px;
   }
 }
 </style>

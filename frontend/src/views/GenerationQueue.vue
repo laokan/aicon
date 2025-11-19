@@ -28,7 +28,7 @@
 import { Timer } from '@element-plus/icons-vue'
 
 // Component logic
-console.log('GenerationQueue component loaded')
+
 </script>
 
 <style scoped>
