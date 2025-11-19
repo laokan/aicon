@@ -13,7 +13,7 @@
 - 方法职责单一，保持简洁
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,8 +21,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.exceptions import BusinessLogicError, NotFoundError
 from src.core.logging import get_logger
 from src.models.chapter import Chapter, ChapterStatus as ModelChapterStatus
+from src.models.paragraph import Paragraph
 from src.models.project import Project
+from src.models.sentence import Sentence
 from src.services.base import BaseService
+from src.services.chapter_content_parser import chapter_content_parser
 
 logger = get_logger(__name__)
 
@@ -91,10 +94,14 @@ class ChapterService(BaseService):
                     context={"project_id": project_id, "chapter_number": chapter_number}
                 )
 
-            # 计算基本统计信息
-            word_count = len(content.replace(' ', ''))  # 简单的字数统计
-            paragraph_count = len([p for p in content.split('\n') if p.strip()])  # 段落数
-            sentence_count = len([s for s in content.split('。') if s.strip()])  # 句子数（简单处理）
+            # 使用内容解析服务重新计算统计信息并生成段落句子结构
+            stats, paragraphs_data, sentences_data = await chapter_content_parser.parse_content_with_structure(
+                chapter_id=None,  # 临时ID，创建章节后会更新
+                content=content
+            )
+            word_count = stats["word_count"]
+            paragraph_count = stats["paragraph_count"]
+            sentence_count = stats["sentence_count"]
 
             # 创建章节对象
             chapter = Chapter(
@@ -110,6 +117,39 @@ class ChapterService(BaseService):
 
             await self.add(chapter)
             await self.flush()  # 获取数据库生成的ID
+
+            # 更新段落数据中的章节ID并创建段落
+            paragraph_ids = []
+            if paragraphs_data:
+                for paragraph_data in paragraphs_data:
+                    paragraph_data["chapter_id"] = chapter.id
+
+                # 批量创建段落
+                paragraph_ids = await Paragraph.batch_create(self.db_session, paragraphs_data, [chapter.id] * len(paragraphs_data))
+
+                # 创建句子并关联段落ID
+                if sentences_data and paragraph_ids:
+                    # 直接使用解析服务已经分配好的句子数据
+                    sentence_idx = 0
+                    for para_idx, paragraph_id in enumerate(paragraph_ids):
+                        if para_idx >= len(paragraphs_data):
+                            break
+
+                        # 获取当前段落的句子数量
+                        para_sentence_count = paragraphs_data[para_idx]["sentence_count"]
+
+                        # 获取对应的句子数据
+                        para_sentences_data = sentences_data[sentence_idx:sentence_idx + para_sentence_count]
+
+                        # 设置句子的段落ID
+                        for sentence_data in para_sentences_data:
+                            sentence_data["paragraph_id"] = paragraph_id
+
+                        # 批量创建当前段落的句子
+                        if para_sentences_data:
+                            await Sentence.batch_create(self.db_session, para_sentences_data, [paragraph_id] * len(para_sentences_data))
+
+                        sentence_idx += para_sentence_count
 
             # 提交事务
             await self.commit()
@@ -301,12 +341,57 @@ class ChapterService(BaseService):
             if hasattr(chapter, field) and value is not None:
                 setattr(chapter, field, value)
 
-        # 如果更新了内容，重新计算统计信息
+        # 如果更新了内容，使用内容解析服务重新计算统计信息并更新段落句子结构
         if 'content' in updates and updates['content']:
             content = updates['content']
-            chapter.word_count = len(content.replace(' ', ''))
-            chapter.paragraph_count = len([p for p in content.split('\n') if p.strip()])
-            chapter.sentence_count = len([s for s in content.split('。') if s.strip()])
+            stats, paragraphs_data, sentences_data = await chapter_content_parser.parse_content_with_structure(
+                chapter_id=chapter.id,
+                content=content
+            )
+            chapter.word_count = stats["word_count"]
+            chapter.paragraph_count = stats["paragraph_count"]
+            chapter.sentence_count = stats["sentence_count"]
+
+            # 删除现有的段落和句子（级联删除）
+            await self.execute(
+                select(Paragraph).where(Paragraph.chapter_id == chapter.id)
+            )
+            existing_paragraphs_result = await self.execute(
+                select(Paragraph).where(Paragraph.chapter_id == chapter.id)
+            )
+            existing_paragraphs = existing_paragraphs_result.scalars().all()
+
+            for para in existing_paragraphs:
+                await self.delete(para)
+
+            # 创建新的段落和句子
+            if paragraphs_data:
+                # 批量创建段落
+                paragraph_ids = await Paragraph.batch_create(self.db_session, paragraphs_data, [chapter.id] * len(paragraphs_data))
+
+                # 创建句子并关联段落ID
+                if sentences_data and paragraph_ids:
+                    # 直接使用解析服务已经分配好的句子数据
+                    sentence_idx = 0
+                    for para_idx, paragraph_id in enumerate(paragraph_ids):
+                        if para_idx >= len(paragraphs_data):
+                            break
+
+                        # 获取当前段落的句子数量
+                        para_sentence_count = paragraphs_data[para_idx]["sentence_count"]
+
+                        # 获取对应的句子数据
+                        para_sentences_data = sentences_data[sentence_idx:sentence_idx + para_sentence_count]
+
+                        # 设置句子的段落ID
+                        for sentence_data in para_sentences_data:
+                            sentence_data["paragraph_id"] = paragraph_id
+
+                        # 批量创建当前段落的句子
+                        if para_sentences_data:
+                            await Sentence.batch_create(self.db_session, para_sentences_data, [paragraph_id] * len(para_sentences_data))
+
+                        sentence_idx += para_sentence_count
 
         await self.commit()
         await self.refresh(chapter)
@@ -356,7 +441,7 @@ class ChapterService(BaseService):
             project_id: str
     ) -> bool:
         """
-        删除章节
+        删除章节及其所有相关的段落和句子
 
         Args:
             chapter_id: 章节ID
@@ -375,87 +460,33 @@ class ChapterService(BaseService):
                 context={"chapter_id": chapter_id, "project_id": project_id}
             )
 
+        # 先统计要删除的段落和句子数量（用于日志记录）
+        from src.models.paragraph import Paragraph
+        from src.models.sentence import Sentence
+        from sqlalchemy import func
+
+        # 统计段落数量
+        paragraph_count_result = await self.execute(
+            select(func.count(Paragraph.id)).where(Paragraph.chapter_id == chapter_id)
+        )
+        paragraph_count = paragraph_count_result.scalar() or 0
+
+        # 统计句子数量
+        sentence_count_result = await self.execute(
+            select(func.count(Sentence.id)).where(Sentence.paragraph_id.in_(
+                select(Paragraph.id).where(Paragraph.chapter_id == chapter_id)
+            ))
+        )
+        sentence_count = sentence_count_result.scalar() or 0
+
+        logger.info(f"开始删除章节: ID={chapter_id}, 标题={chapter.title}, 将删除 {paragraph_count} 个段落, {sentence_count} 个句子")
+
+        # 删除章节（会级联删除所有段落和句子）
         await self.delete(chapter)
         await self.commit()
 
-        logger.info(f"删除章节成功: ID={chapter_id}, 标题={chapter.title}")
+        logger.info(f"删除章节成功: ID={chapter_id}, 标题={chapter.title}, 已删除 {paragraph_count} 个段落, {sentence_count} 个句子")
         return True
-
-    async def batch_update_statistics(self, project_id: str) -> None:
-        """
-        批量更新项目下所有章节的统计信息
-
-        Args:
-            project_id: 项目ID
-        """
-        chapters, _ = await self.get_project_chapters(project_id, size=1000)  # 获取所有章节
-
-        updates = []
-        for chapter in chapters:
-            # 重新计算统计信息
-            content = chapter.content
-            word_count = len(content.replace(' ', ''))
-            paragraph_count = len([p for p in content.split('\n') if p.strip()])
-            sentence_count = len([s for s in content.split('。') if s.strip()])
-
-            updates.append({
-                'id': chapter.id,
-                'word_count': word_count,
-                'paragraph_count': paragraph_count,
-                'sentence_count': sentence_count
-            })
-
-        # 使用模型的批量更新方法
-        if updates:
-            await Chapter.batch_update_statistics(self.db_session, updates)
-            await self.commit()
-
-        logger.info(f"批量更新章节统计信息完成: 项目={project_id}, 章节数={len(updates)}")
-
-    async def get_chapter_statistics(self, project_id: str) -> Dict[str, Any]:
-        """
-        获取项目章节统计信息
-
-        Args:
-            project_id: 项目ID
-
-        Returns:
-            统计信息
-        """
-        # 总章节数
-        total_query = select(func.count(Chapter.id)).filter(Chapter.project_id == project_id)
-        total_result = await self.execute(total_query)
-        total_chapters = total_result.scalar()
-
-        # 按状态分组统计
-        status_query = select(
-            Chapter.status,
-            func.count(Chapter.id)
-        ).filter(Chapter.project_id == project_id).group_by(Chapter.status)
-
-        status_result = await self.execute(status_query)
-        status_stats = {row[0]: row[1] for row in status_result}
-
-        # 统计已确认的章节数
-        confirmed_query = select(func.count(Chapter.id)).filter(
-            Chapter.project_id == project_id,
-            Chapter.is_confirmed == True
-        )
-        confirmed_result = await self.execute(confirmed_query)
-        confirmed_count = confirmed_result.scalar()
-
-        # 统计总字数
-        word_count_query = select(func.sum(Chapter.word_count)).filter(Chapter.project_id == project_id)
-        word_count_result = await self.execute(word_count_query)
-        total_word_count = word_count_result.scalar() or 0
-
-        return {
-            "total_chapters": total_chapters or 0,
-            "confirmed_chapters": confirmed_count or 0,
-            "total_word_count": total_word_count,
-            "status_distribution": status_stats,
-            "confirmation_rate": (confirmed_count / total_chapters * 100) if total_chapters > 0 else 0
-        }
 
 
 __all__ = [

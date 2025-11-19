@@ -252,27 +252,4 @@ async def get_chapter_status(
     )
 
 
-@router.post("/batch/update-statistics")
-async def batch_update_statistics(
-        *,
-        current_user: User = Depends(get_current_user_required),
-        db: AsyncSession = Depends(get_db),
-        project_id: str = Query(..., description="项目ID")
-):
-    """批量更新项目下所有章节的统计信息"""
-    chapter_service = ChapterService(db)
-    project_service = ProjectService(db)
-
-    # 验证项目权限
-    await project_service.get_project_by_id(project_id, current_user.id)
-
-    # 批量更新统计信息
-    await chapter_service.batch_update_statistics(project_id)
-
-    return {
-        "message": "统计信息更新完成",
-        "project_id": project_id
-    }
-
-
 __all__ = ["router"]
