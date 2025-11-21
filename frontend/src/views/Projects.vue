@@ -76,6 +76,7 @@
         @page-change="handlePageChange"
         @size-change="handleSizeChange"
         @row-click="handleRowClick"
+        @create-project="handleCreateProject"
       />
     </div>
 

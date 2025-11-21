@@ -450,10 +450,16 @@ const handleBack = () => {
         type: 'warning'
       }
     ).then(() => {
-      router.push({ name: 'Projects' })
+      router.push({ 
+        name: 'ProjectDetail', 
+        params: { projectId: props.projectId }
+      })
     }).catch(() => {})
   } else {
-    router.push({ name: 'Projects' })
+    router.push({ 
+      name: 'ProjectDetail', 
+      params: { projectId: props.projectId }
+    })
   }
 }
 
