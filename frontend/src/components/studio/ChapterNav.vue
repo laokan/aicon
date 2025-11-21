@@ -181,7 +181,7 @@ const handleLoadMore = () => {
 
 <style scoped>
 .chapter-nav {
-  width: 280px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);

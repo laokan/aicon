@@ -3,11 +3,28 @@
     <!-- 顶部工具栏 -->
     <div class="studio-header">
       <div class="header-left">
-        <el-button @click="handleBack" :icon="ArrowLeft">返回项目</el-button>
+        <el-button @click="handleBack" :icon="ArrowLeft" link>返回</el-button>
         <el-divider direction="vertical" />
+        <el-tooltip content="切换章节列表" placement="bottom">
+          <el-button 
+            @click="showChapterNav = !showChapterNav" 
+            :icon="showChapterNav ? Fold : Expand"
+            link
+          />
+        </el-tooltip>
         <span class="project-title">{{ projectTitle }}</span>
       </div>
       <div class="header-right">
+        <el-tooltip content="切换句子详情" placement="bottom">
+          <el-button 
+            @click="showInspector = !showInspector" 
+            :icon="showInspector ? Expand : Fold"
+            link
+            style="margin-right: 10px"
+          >
+            {{ showInspector ? '隐藏详情' : '显示详情' }}
+          </el-button>
+        </el-tooltip>
         <el-button 
           type="primary" 
           :loading="saving"
@@ -43,20 +60,48 @@
     <!-- 三栏布局 -->
     <div class="studio-body">
       <!-- 左侧：章节导航 -->
-      <ChapterNav
-        :chapters="chapters"
-        :selected-id="selectedChapterId"
-        :loading="chaptersLoading"
-        :has-more="hasMoreChapters"
-        @select="handleChapterSelect"
-        @create="handleChapterCreate"
-        @edit="handleChapterEdit"
-        @delete="handleChapterDelete"
-        @load-more="loadMoreChapters"
-      />
+      <!-- 左侧：章节导航 -->
+      <Transition name="slide-left">
+        <div 
+          v-show="showChapterNav && !inspectorMaximized" 
+          class="panel-container left-panel"
+          :style="{ width: leftPanelWidth + 'px' }"
+        >
+          <ChapterNav
+            :chapters="chapters"
+            :selected-id="selectedChapterId"
+            :loading="chaptersLoading"
+            :has-more="hasMoreChapters"
+            @select="handleChapterSelect"
+            @create="handleChapterCreate"
+            @edit="handleChapterEdit"
+            @delete="handleChapterDelete"
+            @load-more="loadMoreChapters"
+          />
+        </div>
+      </Transition>
+
+      <!-- 左侧调整手柄 -->
+      <div 
+        v-show="showChapterNav && !inspectorMaximized"
+        class="resize-handle left-handle"
+        @mousedown="startResizeLeft"
+      ></div>
+
+      <!-- 左侧折叠条 -->
+      <div 
+        v-if="!showChapterNav && !inspectorMaximized" 
+        class="collapsed-bar left-bar"
+        @click="showChapterNav = true"
+      >
+        <el-tooltip content="展开章节列表" placement="right">
+          <el-button :icon="Expand" link />
+        </el-tooltip>
+      </div>
 
       <!-- 中间：段落编辑器 -->
       <ParagraphStream
+        v-show="!inspectorMaximized"
         :paragraphs="paragraphs"
         :selected-id="selectedParagraphId"
         :loading="paragraphsLoading"
@@ -66,11 +111,39 @@
         @physical-delete="handleParagraphPhysicalDelete"
       />
 
+      <!-- 右侧折叠条 -->
+      <div 
+        v-if="!showInspector && !inspectorMaximized" 
+        class="collapsed-bar right-bar"
+        @click="showInspector = true"
+      >
+        <el-tooltip content="展开句子详情" placement="left">
+          <el-button :icon="Fold" link />
+        </el-tooltip>
+      </div>
+
+      <!-- 右侧调整手柄 -->
+      <div 
+        v-show="showInspector && !inspectorMaximized"
+        class="resize-handle right-handle"
+        @mousedown="startResizeRight"
+      ></div>
+
       <!-- 右侧：句子检查器 -->
-      <SentenceInspector
-        :paragraph="selectedParagraph"
-        :loading="sentencesLoading"
-      />
+      <Transition name="slide-right">
+        <div 
+          v-show="showInspector || inspectorMaximized" 
+          class="panel-container right-panel"
+          :style="{ width: inspectorMaximized ? '100%' : rightPanelWidth + 'px' }"
+        >
+          <SentenceInspector
+            :paragraph="selectedParagraph"
+            :loading="sentencesLoading"
+            :is-maximized="inspectorMaximized"
+            @toggle-maximize="inspectorMaximized = !inspectorMaximized"
+          />
+        </div>
+      </Transition>
     </div>
 
     <!-- 章节编辑对话框 -->
@@ -86,7 +159,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Check } from '@element-plus/icons-vue'
+import { ArrowLeft, Check, Fold, Expand } from '@element-plus/icons-vue'
 import { useProjectsStore } from '@/stores/projects'
 
 import ChapterNav from '@/components/studio/ChapterNav.vue'
@@ -128,6 +201,56 @@ const chaptersLoading = ref(false)
 const paragraphsLoading = ref(false)
 const sentencesLoading = ref(false)
 const saving = ref(false)
+
+// UI状态
+const showChapterNav = ref(true)
+const showInspector = ref(true)
+const inspectorMaximized = ref(false)
+const leftPanelWidth = ref(280)
+const rightPanelWidth = ref(320)
+
+// 调整大小逻辑
+const startResizeLeft = (e) => {
+  e.preventDefault()
+  const startX = e.clientX
+  const startWidth = leftPanelWidth.value
+  
+  const onMouseMove = (e) => {
+    const newWidth = startWidth + (e.clientX - startX)
+    if (newWidth >= 200 && newWidth <= 500) {
+      leftPanelWidth.value = newWidth
+    }
+  }
+  
+  const onMouseUp = () => {
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+  }
+  
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
+}
+
+const startResizeRight = (e) => {
+  e.preventDefault()
+  const startX = e.clientX
+  const startWidth = rightPanelWidth.value
+  
+  const onMouseMove = (e) => {
+    const newWidth = startWidth - (e.clientX - startX) // 右侧是减去增量
+    if (newWidth >= 250 && newWidth <= 600) {
+      rightPanelWidth.value = newWidth
+    }
+  }
+  
+  const onMouseUp = () => {
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+  }
+  
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
+}
 
 // 修改追踪
 const modifiedParagraphs = ref(new Map())
@@ -556,5 +679,78 @@ onMounted(async () => {
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative; /* 确保过渡效果正常 */
+}
+
+/* 过渡动画 */
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.slide-left-enter-from,
+.slide-left-leave-to {
+  width: 0 !important;
+  min-width: 0 !important;
+  opacity: 0;
+  margin-left: -280px; /* ChapterNav width */
+}
+
+.slide-right-enter-from,
+.slide-right-leave-to {
+  width: 0 !important;
+  min-width: 0 !important;
+  opacity: 0;
+  margin-right: -320px; /* SentenceInspector width */
+}
+
+.panel-container {
+  height: 100%;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: width 0.1s; /* 拖动时稍微平滑一点，但不要太慢 */
+}
+
+.resize-handle {
+  width: 4px;
+  height: 100%;
+  background: transparent;
+  cursor: col-resize;
+  transition: background-color 0.2s;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background: var(--primary-color);
+}
+
+.collapsed-bar {
+  width: 40px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-primary);
+  border-right: 1px solid var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: var(--space-md);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.collapsed-bar:hover {
+  background: var(--bg-hover);
+}
+
+.collapsed-bar.left-bar {
+  border-left: none;
+}
+
+.collapsed-bar.right-bar {
+  border-right: none;
 }
 </style>

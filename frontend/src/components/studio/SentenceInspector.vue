@@ -1,7 +1,13 @@
 <template>
   <div class="sentence-inspector">
-    <div class="inspector-header">
+    <div class="inspector-header" @click="$emit('toggle-maximize')">
       <h3>详情面板</h3>
+      <el-button 
+        link 
+        :icon="isMaximized ? 'Close' : 'FullScreen'" 
+        @click.stop="$emit('toggle-maximize')"
+        :title="isMaximized ? '退出专注模式' : '专注模式'"
+      />
     </div>
 
     <div v-if="!paragraph" class="inspector-empty">
@@ -27,6 +33,11 @@
               {{ getActionText(paragraph.action) }}
             </el-tag>
           </div>
+        </div>
+        <!-- 段落内容预览 -->
+        <div class="paragraph-preview" v-if="paragraph.content">
+          <span class="label">原始内容：</span>
+          <p>{{ paragraph.content }}</p>
         </div>
       </div>
 
@@ -112,7 +123,7 @@
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import { InfoFilled, Plus, Edit, Delete } from '@element-plus/icons-vue'
+import { InfoFilled, Plus, Edit, Delete, FullScreen, Close } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import sentencesService from '@/services/sentences'
 
@@ -124,8 +135,14 @@ const props = defineProps({
   loading: {
     type: Boolean,
     default: false
+  },
+  isMaximized: {
+    type: Boolean,
+    default: false
   }
 })
+
+const emit = defineEmits(['toggle-maximize'])
 
 // 状态
 const sentences = ref([])
@@ -269,7 +286,7 @@ const getActionText = (action) => {
 
 <style scoped>
 .sentence-inspector {
-  width: 320px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);
@@ -280,6 +297,15 @@ const getActionText = (action) => {
 .inspector-header {
   padding: var(--space-md);
   border-bottom: 1px solid var(--border-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.inspector-header:hover {
+  background: var(--bg-hover);
 }
 
 .inspector-header h3 {
@@ -347,7 +373,31 @@ const getActionText = (action) => {
 .info-item .value {
   font-size: var(--text-sm);
   font-weight: 600;
+  font-weight: 600;
   color: var(--text-primary);
+}
+
+.paragraph-preview {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-secondary);
+}
+
+.paragraph-preview .label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+  display: block;
+}
+
+.paragraph-preview p {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin: 0;
+  background: var(--bg-secondary);
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
 }
 
 .sentence-list {
