@@ -4,10 +4,11 @@
 
 from datetime import datetime
 from typing import Any, Dict, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
-from .base import MessageResponse
+from .base import MessageResponse, UUIDMixin
 
 
 class UserUpdateRequest(BaseModel):
@@ -66,9 +67,9 @@ class PasswordChangeRequest(BaseModel):
         return v
 
 
-class UserResponse(BaseModel):
+class UserResponse(UUIDMixin):
     """用户信息响应"""
-    id: str
+    id: UUID
     username: str
     email: str
     display_name: Optional[str]
@@ -101,7 +102,7 @@ class UserResponse(BaseModel):
             preferences = user.preferences
 
         return cls(
-            id=str(user.id),
+            id=user.id,  # UUID对象，UUIDMixin会自动序列化
             username=user.username,
             email=user.email,
             display_name=user.display_name,

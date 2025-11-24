@@ -1,0 +1,302 @@
+"""
+API密钥服务层 - 处理API密钥的业务逻辑
+"""
+
+from typing import List, Optional, Tuple
+
+from fastapi import HTTPException, status
+from sqlalchemy import and_, func, or_, select
+
+from src.core.logging import get_logger
+from src.models.api_key import APIKey, APIKeyStatus
+from src.services.base import BaseService
+
+logger = get_logger(__name__)
+
+
+class APIKeyService(BaseService):
+    """API密钥服务类"""
+
+    async def create_api_key(
+        self,
+        user_id: str,
+        name: str,
+        provider: str,
+        api_key: str,
+        base_url: Optional[str] = None
+    ) -> APIKey:
+        """
+        创建新的API密钥
+        
+        Args:
+            user_id: 用户ID
+            name: 密钥名称
+            provider: 服务提供商
+            api_key: API密钥（明文）
+            base_url: API基础URL
+            
+        Returns:
+            创建的API密钥对象
+        """
+        try:
+            # 创建API密钥对象
+            new_key = APIKey(
+                user_id=user_id,
+                name=name,
+                provider=provider.lower(),
+                base_url=base_url,
+                status=APIKeyStatus.ACTIVE
+            )
+            
+            # 设置加密的API密钥
+            new_key.set_api_key(api_key)
+            
+            # 保存到数据库
+            self.db_session.add(new_key)
+            await self.flush()
+            await self.refresh(new_key)
+            
+            logger.info(f"创建API密钥成功: {new_key.id} (用户: {user_id}, 提供商: {provider})")
+            return new_key
+            
+        except Exception as e:
+            logger.error(f"创建API密钥失败: {e}")
+            await self.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"创建API密钥失败: {str(e)}"
+            )
+
+    async def get_user_api_keys(
+        self,
+        user_id: str,
+        provider: Optional[str] = None,
+        key_status: Optional[str] = None,
+        page: int = 1,
+        size: int = 20
+    ) -> Tuple[List[APIKey], int]:
+        """
+        获取用户的API密钥列表（分页）
+        
+        Args:
+            user_id: 用户ID
+            provider: 服务提供商过滤
+            key_status: 状态过滤
+            page: 页码
+            size: 每页大小
+            
+        Returns:
+            (API密钥列表, 总数)
+        """
+        try:
+            # 构建查询条件
+            conditions = [APIKey.user_id == user_id]
+            
+            if provider:
+                conditions.append(APIKey.provider == provider.lower())
+            
+            if key_status:
+                conditions.append(APIKey.status == key_status.lower())
+            
+            # 查询总数
+            count_query = select(func.count()).select_from(APIKey).where(and_(*conditions))
+            total_result = await self.db_session.execute(count_query)
+            total = total_result.scalar()
+            
+            # 查询数据
+            query = (
+                select(APIKey)
+                .where(and_(*conditions))
+                .order_by(APIKey.created_at.desc())
+                .offset((page - 1) * size)
+                .limit(size)
+            )
+            
+            result = await self.db_session.execute(query)
+            api_keys = result.scalars().all()
+            
+            logger.debug(f"获取用户API密钥列表: 用户={user_id}, 总数={total}, 页={page}")
+            return list(api_keys), total
+            
+        except Exception as e:
+            logger.error(f"获取API密钥列表失败: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"获取API密钥列表失败: {str(e)}"
+            )
+
+    async def get_api_key_by_id(self, key_id: str, user_id: str) -> APIKey:
+        """
+        根据ID获取API密钥
+        
+        Args:
+            key_id: 密钥ID
+            user_id: 用户ID
+            
+        Returns:
+            API密钥对象
+            
+        Raises:
+            HTTPException: 密钥不存在或无权访问
+        """
+        try:
+            api_key = await APIKey.get_by_id_and_user(self.db_session, key_id, user_id)
+            
+            if not api_key:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="API密钥不存在或无权访问"
+                )
+            
+            return api_key
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"获取API密钥失败: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"获取API密钥失败: {str(e)}"
+            )
+
+    async def update_api_key(
+        self,
+        key_id: str,
+        user_id: str,
+        name: Optional[str] = None,
+        base_url: Optional[str] = None,
+        key_status: Optional[str] = None
+    ) -> APIKey:
+        """
+        更新API密钥
+        
+        Args:
+            key_id: 密钥ID
+            user_id: 用户ID
+            name: 新名称
+            base_url: 新基础URL
+            key_status: 新状态
+            
+        Returns:
+            更新后的API密钥对象
+        """
+        try:
+            # 获取API密钥
+            api_key = await self.get_api_key_by_id(key_id, user_id)
+            
+            # 更新字段
+            if name is not None:
+                api_key.name = name
+            
+            if base_url is not None:
+                api_key.base_url = base_url
+            
+            if key_status is not None:
+                api_key.status = key_status.lower()
+            
+            await self.flush()
+            await self.refresh(api_key)
+            
+            logger.info(f"更新API密钥成功: {key_id}")
+            return api_key
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"更新API密钥失败: {e}")
+            await self.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"更新API密钥失败: {str(e)}"
+            )
+
+    async def delete_api_key(self, key_id: str, user_id: str) -> None:
+        """
+        删除API密钥
+        
+        Args:
+            key_id: 密钥ID
+            user_id: 用户ID
+        """
+        try:
+            # 获取API密钥
+            api_key = await self.get_api_key_by_id(key_id, user_id)
+            
+            # 删除
+            await self.db_session.delete(api_key)
+            await self.flush()
+            
+            logger.info(f"删除API密钥成功: {key_id}")
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"删除API密钥失败: {e}")
+            await self.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"删除API密钥失败: {str(e)}"
+            )
+
+    async def update_usage(self, key_id: str, user_id: str) -> APIKey:
+        """
+        更新API密钥使用统计
+        
+        Args:
+            key_id: 密钥ID
+            user_id: 用户ID
+            
+        Returns:
+            更新后的API密钥对象
+        """
+        try:
+            api_key = await self.get_api_key_by_id(key_id, user_id)
+            api_key.update_usage()
+            
+            await self.flush()
+            await self.refresh(api_key)
+            
+            logger.debug(f"更新API密钥使用统计: {key_id}, 使用次数: {api_key.usage_count}")
+            return api_key
+            
+        except Exception as e:
+            logger.error(f"更新使用统计失败: {e}")
+            await self.rollback()
+            raise
+
+    async def get_active_keys_by_provider(
+        self,
+        user_id: str,
+        provider: str
+    ) -> List[APIKey]:
+        """
+        获取用户指定提供商的激活密钥
+        
+        Args:
+            user_id: 用户ID
+            provider: 服务提供商
+            
+        Returns:
+            激活的API密钥列表
+        """
+        try:
+            api_keys = await APIKey.get_active_by_provider(
+                self.db_session,
+                user_id,
+                provider.lower()
+            )
+            
+            logger.debug(f"获取激活密钥: 用户={user_id}, 提供商={provider}, 数量={len(api_keys)}")
+            return api_keys
+            
+        except Exception as e:
+            logger.error(f"获取激活密钥失败: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"获取激活密钥失败: {str(e)}"
+            )
+
+
+__all__ = [
+    "APIKeyService",
+]

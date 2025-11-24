@@ -6,7 +6,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from sqlalchemy import Column, DateTime, String
+from sqlalchemy import Column, DateTime
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -20,7 +21,7 @@ class TimestampMixin:
 
 class UUIDMixin:
     """UUID主键混入类"""
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), nullable=False, comment="主键ID")
+    id = Column(PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False, comment="主键ID")
 
 
 class BaseModel(Base, UUIDMixin, TimestampMixin):

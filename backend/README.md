@@ -46,6 +46,9 @@ uv sync --index=https://pypi.tuna.tsinghua.edu.cn/simple
 # 运行数据库迁移
 uv run alembic upgrade head
 
+# 降级
+alembic downgrade -1  # 回滚
+
 # 启动API服务
 uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```

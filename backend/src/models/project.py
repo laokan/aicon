@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Any, Dict
 
 from sqlalchemy import Column, DateTime, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import relationship
 
 from src.models.base import BaseModel
@@ -28,7 +29,7 @@ class Project(BaseModel):
     __tablename__ = 'projects'
 
     # 基础字段 - 按照data-model.md规范
-    owner_id = Column(String, nullable=False, index=True, comment="外键索引，无约束")  # 外键索引，无约束
+    owner_id = Column(PostgreSQLUUID(as_uuid=True), nullable=False, index=True, comment="外键索引，无约束")  # 外键索引，无约束
     title = Column(String(200), nullable=False, comment="项目标题")
     description = Column(Text, nullable=True, comment="项目描述")
 

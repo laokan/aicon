@@ -3,10 +3,11 @@
 """
 
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .base import PaginatedResponse
+from .base import PaginatedResponse, UUIDMixin
 
 
 class ChapterCreate(BaseModel):
@@ -46,10 +47,10 @@ class ChapterUpdate(BaseModel):
     }
 
 
-class ChapterResponse(BaseModel):
+class ChapterResponse(UUIDMixin):
     """章节响应模型"""
-    id: str = Field(..., description="章节ID")
-    project_id: str = Field(..., description="项目ID")
+    id: UUID = Field(..., description="章节ID")
+    project_id: UUID = Field(..., description="项目ID")
     title: str = Field(..., description="章节标题")
     content: str = Field(..., description="章节原始内容")
     chapter_number: int = Field(..., description="章节序号")

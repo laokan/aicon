@@ -2,15 +2,17 @@
 数据模型模块
 """
 
-from .base import Base
-from .user import User
-from .project import Project, ProjectStatus
-from .chapter import Chapter, ChapterStatus
-from .paragraph import Paragraph, ParagraphAction
-from .sentence import Sentence, SentenceStatus
+from src.models.api_key import APIKey, APIKeyProvider, APIKeyStatus
+from src.models.base import Base, BaseModel
+from src.models.chapter import Chapter, ChapterStatus
+from src.models.paragraph import Paragraph, ParagraphAction
+from src.models.project import Project, ProjectStatus
+from src.models.sentence import Sentence, SentenceStatus
+from src.models.user import User
 
 __all__ = [
     "Base",
+    "BaseModel",
     "User",
     "Project",
     "ProjectStatus",
@@ -20,4 +22,7 @@ __all__ = [
     "ParagraphAction",
     "Sentence",
     "SentenceStatus",
+    "APIKey",
+    "APIKeyStatus",
+    "APIKeyProvider",
 ]

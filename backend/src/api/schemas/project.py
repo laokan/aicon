@@ -3,10 +3,11 @@
 """
 
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .base import PaginatedResponse
+from .base import PaginatedResponse, UUIDMixin
 
 
 class ProjectCreate(BaseModel):
@@ -49,10 +50,10 @@ class ProjectUpdate(BaseModel):
     }
 
 
-class ProjectResponse(BaseModel):
+class ProjectResponse(UUIDMixin):
     """项目响应模型"""
-    id: str = Field(..., description="项目ID")
-    owner_id: str = Field(..., description="所有者ID")
+    id: UUID = Field(..., description="项目ID")
+    owner_id: UUID = Field(..., description="所有者ID")
     title: str = Field(..., description="项目标题")
     description: Optional[str] = Field(None, description="项目描述")
     file_name: str = Field(..., description="文件名称")

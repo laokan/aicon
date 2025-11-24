@@ -3,8 +3,20 @@
 """
 
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
+
+
+class UUIDMixin(BaseModel):
+    """UUID序列化混入类 - 自动将UUID对象序列化为字符串"""
+    
+    @field_serializer('*', when_used='json')
+    def serialize_uuid(self, value: Any) -> Any:
+        """序列化UUID字段为字符串"""
+        if isinstance(value, UUID):
+            return str(value)
+        return value
 
 
 class MessageResponse(BaseModel):
@@ -74,6 +86,7 @@ class ValidationErrorResponse(ErrorResponse):
 
 
 __all__ = [
+    "UUIDMixin",
     "MessageResponse",
     "SuccessResponse",
     "PaginatedResponse",

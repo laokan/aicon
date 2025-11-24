@@ -10,6 +10,7 @@ from typing import Dict, List, TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import relationship
 
 from .base import BaseModel
@@ -30,7 +31,7 @@ class Sentence(BaseModel):
     __tablename__ = 'sentences'
 
     # 基础字段 (ID, created_at, updated_at 继承自 BaseModel)
-    paragraph_id = Column(String, ForeignKey('paragraphs.id'), nullable=False, index=True, comment="段落外键")
+    paragraph_id = Column(PostgreSQLUUID(as_uuid=True), ForeignKey('paragraphs.id'), nullable=False, index=True, comment="段落外键")
     content = Column(Text, nullable=False, comment="句子内容")
 
     # 结构信息
@@ -105,7 +106,7 @@ class Sentence(BaseModel):
         # 生成ID并添加到数据中
         sentence_ids = []
         for i, sentence_data in enumerate(sentences_data):
-            sentence_id = str(uuid.uuid4())
+            sentence_id = uuid.uuid4()
             sentence_data['id'] = sentence_id
             sentence_data['paragraph_id'] = paragraph_ids[i]
             sentence_data.setdefault('status', SentenceStatus.PENDING.value)

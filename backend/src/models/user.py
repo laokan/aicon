@@ -33,7 +33,7 @@ class User(BaseModel):
 
     # 关系定义
     # projects = relationship("Project", back_populates="owner", cascade="all, delete-orphan")
-    # api_configs = relationship("APIConfig", back_populates="user", cascade="all, delete-orphan")
+    # api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
     # publication_records = relationship("PublicationRecord", back_populates="user")
 
     def get_preferences(self) -> dict:

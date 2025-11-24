@@ -1,7 +1,7 @@
 """create content tables: chapters, paragraphs, sentences
 
 Revision ID: 004
-Revises: 002
+Revises: 003
 Create Date: 2025-11-13 08:35:00.000000
 
 """
@@ -19,8 +19,8 @@ depends_on = None
 def upgrade():
     # Create chapters table
     op.create_table('chapters',
-        sa.Column('id', sa.String(), nullable=False, comment='主键ID'),
-        sa.Column('project_id', sa.String(), nullable=False, comment='外键索引，无约束'),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False, comment='主键ID'),
+        sa.Column('project_id', postgresql.UUID(as_uuid=True), nullable=False, comment='外键索引，无约束'),
         sa.Column('title', sa.String(length=500), nullable=False, comment='章节标题'),
         sa.Column('content', sa.Text(), nullable=False, comment='章节内容'),
         sa.Column('chapter_number', sa.Integer(), nullable=False, comment='章节序号'),
@@ -46,8 +46,8 @@ def upgrade():
 
     # Create paragraphs table
     op.create_table('paragraphs',
-        sa.Column('id', sa.String(), nullable=False, comment='主键ID'),
-        sa.Column('chapter_id', sa.String(), nullable=False, comment='外键索引，无约束'),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False, comment='主键ID'),
+        sa.Column('chapter_id', postgresql.UUID(as_uuid=True), nullable=False, comment='外键索引，无约束'),
         sa.Column('content', sa.Text(), nullable=False, comment='段落内容'),
         sa.Column('order_index', sa.Integer(), nullable=False, comment='在章节中的顺序'),
         sa.Column('word_count', sa.Integer(), default=0, comment='字数统计'),
@@ -70,8 +70,8 @@ def upgrade():
 
     # Create sentences table
     op.create_table('sentences',
-        sa.Column('id', sa.String(), nullable=False, comment='主键ID'),
-        sa.Column('paragraph_id', sa.String(), nullable=False, comment='外键索引，无约束'),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False, comment='主键ID'),
+        sa.Column('paragraph_id', postgresql.UUID(as_uuid=True), nullable=False, comment='外键索引，无约束'),
         sa.Column('content', sa.Text(), nullable=False, comment='句子内容'),
         sa.Column('order_index', sa.Integer(), nullable=False, comment='在段落中的顺序'),
         sa.Column('word_count', sa.Integer(), default=0, comment='字数统计'),

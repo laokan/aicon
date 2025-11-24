@@ -4,10 +4,12 @@
 
 from typing import List, Optional
 from datetime import datetime
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 from src.models.sentence import SentenceStatus
-from .base import PaginatedResponse
+from .base import PaginatedResponse, UUIDMixin
 
 
 class SentenceBase(BaseModel):
@@ -41,10 +43,10 @@ class SentenceUpdate(BaseModel):
     }
 
 
-class SentenceResponse(SentenceBase):
+class SentenceResponse(UUIDMixin, SentenceBase):
     """句子响应模型"""
-    id: str = Field(..., description="句子ID")
-    paragraph_id: str = Field(..., description="所属段落ID")
+    id: UUID = Field(..., description="句子ID")
+    paragraph_id: UUID = Field(..., description="所属段落ID")
     order_index: int = Field(..., description="顺序索引")
     word_count: int = Field(0, description="字数统计")
     character_count: int = Field(0, description="字符数量")

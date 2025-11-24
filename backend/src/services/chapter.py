@@ -89,9 +89,7 @@ class ChapterService(BaseService):
             existing_chapter = await self.get_chapter_by_number(project_id, chapter_number)
             if existing_chapter:
                 raise BusinessLogicError(
-                    f"章节序号 {chapter_number} 已存在",
-                    business_rule="chapter_number_unique",
-                    context={"project_id": project_id, "chapter_number": chapter_number}
+                    f"章节序号 {chapter_number} 已存在"
                 )
 
             # 使用内容解析服务重新计算统计信息并生成段落句子结构
@@ -124,7 +122,8 @@ class ChapterService(BaseService):
                     paragraph_data["chapter_id"] = chapter.id
 
                 # 批量创建段落
-                paragraph_ids = await Paragraph.batch_create(self.db_session, paragraphs_data, [chapter.id] * len(paragraphs_data))
+                paragraph_ids = await Paragraph.batch_create(self.db_session, paragraphs_data,
+                                                             [chapter.id] * len(paragraphs_data))
 
                 # 创建句子并关联段落ID
                 if sentences_data and paragraph_ids:
@@ -146,7 +145,8 @@ class ChapterService(BaseService):
 
                         # 批量创建当前段落的句子
                         if para_sentences_data:
-                            await Sentence.batch_create(self.db_session, para_sentences_data, [paragraph_id] * len(para_sentences_data))
+                            await Sentence.batch_create(self.db_session, para_sentences_data,
+                                                        [paragraph_id] * len(para_sentences_data))
 
                         sentence_idx += para_sentence_count
 
@@ -339,8 +339,6 @@ class ChapterService(BaseService):
         if chapter.is_confirmed:
             raise BusinessLogicError(
                 "已确认的章节不能修改",
-                business_rule="confirmed_chapter_update",
-                context={"chapter_id": chapter_id, "project_id": project_id}
             )
 
         # 更新字段
@@ -374,7 +372,8 @@ class ChapterService(BaseService):
             # 创建新的段落和句子
             if paragraphs_data:
                 # 批量创建段落
-                paragraph_ids = await Paragraph.batch_create(self.db_session, paragraphs_data, [chapter.id] * len(paragraphs_data))
+                paragraph_ids = await Paragraph.batch_create(self.db_session, paragraphs_data,
+                                                             [chapter.id] * len(paragraphs_data))
 
                 # 创建句子并关联段落ID
                 if sentences_data and paragraph_ids:
@@ -396,7 +395,8 @@ class ChapterService(BaseService):
 
                         # 批量创建当前段落的句子
                         if para_sentences_data:
-                            await Sentence.batch_create(self.db_session, para_sentences_data, [paragraph_id] * len(para_sentences_data))
+                            await Sentence.batch_create(self.db_session, para_sentences_data,
+                                                        [paragraph_id] * len(para_sentences_data))
 
                         sentence_idx += para_sentence_count
 
@@ -427,8 +427,6 @@ class ChapterService(BaseService):
         if chapter.is_confirmed:
             raise BusinessLogicError(
                 "章节已经确认",
-                business_rule="chapter_already_confirmed",
-                context={"chapter_id": chapter_id, "project_id": project_id}
             )
 
         # 执行确认操作
@@ -462,9 +460,7 @@ class ChapterService(BaseService):
         # 检查是否已确认（已确认的章节不能删除）
         if chapter.is_confirmed:
             raise BusinessLogicError(
-                "已确认的章节不能删除",
-                business_rule="confirmed_chapter_delete",
-                context={"chapter_id": chapter_id, "project_id": project_id}
+                "已确认的章节不能删除"
             )
 
         # 先统计要删除的段落和句子数量（用于日志记录）
@@ -486,13 +482,15 @@ class ChapterService(BaseService):
         )
         sentence_count = sentence_count_result.scalar() or 0
 
-        logger.info(f"开始删除章节: ID={chapter_id}, 标题={chapter.title}, 将删除 {paragraph_count} 个段落, {sentence_count} 个句子")
+        logger.info(
+            f"开始删除章节: ID={chapter_id}, 标题={chapter.title}, 将删除 {paragraph_count} 个段落, {sentence_count} 个句子")
 
         # 删除章节（会级联删除所有段落和句子）
         await self.delete(chapter)
         await self.commit()
 
-        logger.info(f"删除章节成功: ID={chapter_id}, 标题={chapter.title}, 已删除 {paragraph_count} 个段落, {sentence_count} 个句子")
+        logger.info(
+            f"删除章节成功: ID={chapter_id}, 标题={chapter.title}, 已删除 {paragraph_count} 个段落, {sentence_count} 个句子")
         return True
 
 

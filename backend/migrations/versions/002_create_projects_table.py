@@ -17,10 +17,10 @@ depends_on = None
 
 
 def upgrade():
-    # 创建 projects 表 - 严格按照data-model.md规范
+    # 创建 projects 表 - 使用 UUID 类型
     op.create_table('projects',
-        sa.Column('id', sa.String(), nullable=False, comment='主键ID'),
-        sa.Column('owner_id', sa.String(), nullable=False, comment='外键索引，无约束'),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False, comment='主键ID'),
+        sa.Column('owner_id', postgresql.UUID(as_uuid=True), nullable=False, comment='外键索引，无约束'),
         sa.Column('title', sa.String(length=200), nullable=False, comment='项目标题'),
         sa.Column('description', sa.Text(), nullable=True, comment='项目描述'),
         sa.Column('file_name', sa.String(length=255), nullable=False, comment='文件名称'),

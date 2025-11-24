@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     # 密码加密
     BCRYPT_ROUNDS: int = 12
 
+    # API密钥加密配置
+    API_KEY_ENCRYPTION_KEY: Optional[str] = Field(
+        default=None,
+        env="API_KEY_ENCRYPTION_KEY"
+    )
+
     # MinIO配置
     MINIO_ENDPOINT: str = Field(default="localhost:9000", env="MINIO_ENDPOINT")
     MINIO_ACCESS_KEY: str = Field(default="minioadmin", env="MINIO_ACCESS_KEY")

@@ -9,6 +9,7 @@ from typing import Dict, List, TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import relationship
 
 from .base import BaseModel
@@ -29,7 +30,7 @@ class Paragraph(BaseModel):
     __tablename__ = 'paragraphs'
 
     # 基础字段 (ID, created_at, updated_at 继承自 BaseModel)
-    chapter_id = Column(String, ForeignKey('chapters.id'), nullable=False, index=True, comment="章节外键")
+    chapter_id = Column(PostgreSQLUUID(as_uuid=True), ForeignKey('chapters.id'), nullable=False, index=True, comment="章节外键")
     content = Column(Text, nullable=False, comment="段落内容")
 
     # 结构信息
@@ -84,7 +85,7 @@ class Paragraph(BaseModel):
         # 生成ID并添加到数据中
         paragraph_ids = []
         for i, paragraph_data in enumerate(paragraphs_data):
-            paragraph_id = str(uuid.uuid4())
+            paragraph_id = uuid.uuid4()
             paragraph_data['id'] = paragraph_id
             paragraph_data['chapter_id'] = chapter_ids[i]
             paragraph_data.setdefault('action', ParagraphAction.KEEP.value)

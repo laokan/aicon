@@ -17,9 +17,9 @@ depends_on = None
 
 
 def upgrade():
-    # 创建 users 表 - 严格按照原始数据模型规范
+    # 创建 users 表 - 使用 UUID 类型
     op.create_table('users',
-        sa.Column('id', sa.String(), nullable=False, comment='主键ID'),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False, comment='主键ID'),
         sa.Column('username', sa.String(length=50), nullable=False, comment='用户名'),
         sa.Column('email', sa.String(length=100), nullable=False, comment='邮箱'),
         sa.Column('password_hash', sa.String(length=255), nullable=False, comment='密码哈希'),

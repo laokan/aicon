@@ -14,6 +14,7 @@ const ProjectDetail = () => import('@/components/project/ProjectDetail.vue')
 const GenerationQueue = () => import('@/views/GenerationQueue.vue')
 const GenerationSettings = () => import('@/views/GenerationSettings.vue')
 const Publish = () => import('@/views/Publish.vue')
+const APIKeys = () => import('@/views/APIKeys.vue')
 const Settings = () => import('@/views/Settings.vue')
 
 const routes = [
@@ -130,6 +131,19 @@ const routes = [
         path: '',
         name: 'PublishPage',
         component: Publish
+      }
+    ]
+  },
+  {
+    path: '/api-keys',
+    name: 'APIKeys',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'APIKeysPage',
+        component: APIKeys
       }
     ]
   },

@@ -82,7 +82,8 @@ import {
   Folder,
   Document,
   Promotion,
-  Setting
+  Setting,
+  Key
 } from '@element-plus/icons-vue'
 
 // Props
@@ -126,6 +127,12 @@ const menuItems = [
     title: '内容发布',
     path: '/publish',
     icon: Promotion,
+    badge: null
+  },
+  {
+    title: 'API密钥',
+    path: '/api-keys',
+    icon: Key,
     badge: null
   },
   {

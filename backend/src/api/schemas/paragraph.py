@@ -3,12 +3,11 @@
 """
 
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .base import PaginatedResponse
-
-
+from .base import PaginatedResponse, UUIDMixin
 
 
 class ParagraphCreate(BaseModel):
@@ -24,7 +23,6 @@ class ParagraphCreate(BaseModel):
             }
         }
     }
-
 
 
 class ParagraphUpdate(BaseModel):
@@ -46,10 +44,10 @@ class ParagraphUpdate(BaseModel):
     }
 
 
-class ParagraphResponse(BaseModel):
+class ParagraphResponse(UUIDMixin):
     """段落响应模型"""
-    id: str = Field(..., description="段落ID")
-    chapter_id: str = Field(..., description="章节ID")
+    id: UUID = Field(..., description="段落ID")
+    chapter_id: UUID = Field(..., description="章节ID")
     content: str = Field(..., description="段落内容")
     order_index: int = Field(..., description="在章节中的顺序")
     word_count: int = Field(0, description="字数统计")

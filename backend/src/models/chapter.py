@@ -9,6 +9,7 @@ from typing import Dict, List, TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import relationship
 
 from .base import BaseModel
@@ -30,7 +31,7 @@ class Chapter(BaseModel):
     __tablename__ = 'chapters'
 
     # 基础字段 (ID, created_at, updated_at 继承自 BaseModel)
-    project_id = Column(String, ForeignKey('projects.id'), nullable=False, index=True, comment="项目外键")
+    project_id = Column(PostgreSQLUUID(as_uuid=True), ForeignKey('projects.id'), nullable=False, index=True, comment="项目外键")
     title = Column(String(500), nullable=False, comment="章节标题")
     content = Column(Text, nullable=False, comment="章节原始内容")
 
@@ -101,7 +102,7 @@ class Chapter(BaseModel):
         # 生成ID并添加到数据中
         chapter_ids = []
         for chapter_data in chapters_data:
-            chapter_id = str(uuid.uuid4())
+            chapter_id = uuid.uuid4()
             chapter_data['id'] = chapter_id
             chapter_data.setdefault('is_confirmed', False)
             chapter_ids.append(chapter_id)
