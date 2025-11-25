@@ -71,9 +71,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import chaptersService from '@/services/chapters'
-import paragraphsService from '@/services/paragraphs'
-import sentencesService from '@/services/sentences'
-import axios from 'axios'
+import api from '@/services/api'
 
 const route = useRoute()
 
@@ -127,25 +125,15 @@ const loadApiKeys = async () => {
   ]
 }
 
-// 加载句子
+// 加载句子 - 使用优化的批量接口
 const loadSentences = async () => {
   if (!selectedChapterId.value) return
   
   loading.value = true
   try {
-    // 获取该章节下的所有段落
-    const paragraphsRes = await paragraphsService.getParagraphs(selectedChapterId.value)
-    const paragraphs = paragraphsRes.paragraphs || []
-    
-    // 获取所有段落的句子
-    let allSentences = []
-    for (const p of paragraphs) {
-      const sentencesRes = await sentencesService.getSentences(p.id)
-      const paragraphSentences = sentencesRes.sentences || []
-      allSentences = allSentences.concat(paragraphSentences)
-    }
-    
-    sentences.value = allSentences.sort((a, b) => a.order_index - b.order_index)
+    // 使用新的批量接口，一次性获取所有句子
+    const response = await api.get(`/chapters/${selectedChapterId.value}/sentences`)
+    sentences.value = response.sentences || []
   } catch (error) {
     console.error('加载句子失败', error)
     ElMessage.error('加载句子失败')
@@ -164,7 +152,7 @@ const generatePrompts = async () => {
   generating.value = true
   try {
     // 调用新API - 使用正确的端点和请求格式
-    const response = await axios.post('/api/v1/prompt/generate-prompts', {
+    const response = await api.post('/prompt/generate-prompts', {
       chapter_id: selectedChapterId.value,
       api_key: selectedApiKey.value,
       provider: 'volcengine', // 暂时硬编码，应从selectedApiKey中获取

@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_current_user_required
-from src.api.schemas.chapter import (ChapterConfirmResponse, ChapterCreate, ChapterDeleteResponse, ChapterListResponse, ChapterResponse,
+from src.api.schemas.chapter import (ChapterConfirmResponse, ChapterCreate, ChapterDeleteResponse, ChapterListResponse,
+                                     ChapterResponse,
                                      ChapterStatusResponse, ChapterUpdate)
 from src.core.database import get_db
 from src.core.logging import get_logger
@@ -250,6 +251,46 @@ async def get_chapter_status(
         can_confirm=can_confirm,
         can_generate=can_generate
     )
+
+
+@router.get("/{chapter_id}/sentences", response_model=dict)
+async def get_chapter_sentences(
+        *,
+        current_user: User = Depends(get_current_user_required),
+        db: AsyncSession = Depends(get_db),
+        chapter_id: str
+):
+    """获取章节的所有句子（一次性加载，用于导演引擎）"""
+    from sqlalchemy import select
+    from src.models.paragraph import Paragraph
+    from src.models.sentence import Sentence
+    from src.api.schemas.sentence import SentenceResponse
+
+    chapter_service = ChapterService(db)
+
+    # 获取章节并验证权限
+    chapter = await chapter_service.get_chapter_by_id(chapter_id)
+    project_service = ProjectService(db)
+    await project_service.get_project_by_id(chapter.project_id, current_user.id)
+
+    # 使用 JOIN 一次性查询所有句子，避免 N+1 问题
+    stmt = (
+        select(Sentence)
+        .join(Paragraph, Sentence.paragraph_id == Paragraph.id)
+        .where(Paragraph.chapter_id == chapter_id)
+        .order_by(Paragraph.order_index).order_by(Sentence.order_index)
+    )
+
+    result = await db.execute(stmt)
+    sentences = result.scalars().all()
+
+    # 转换为响应模型
+    sentence_responses = [SentenceResponse.from_dict(s.to_dict()) for s in sentences]
+
+    return {
+        "sentences": sentence_responses,
+        "total": len(sentence_responses)
+    }
 
 
 __all__ = ["router"]
