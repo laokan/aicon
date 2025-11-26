@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.dependencies import get_current_user_required
 from src.api.schemas.prompt import PromptGenerateRequest, PromptGenerateResponse
 from src.core.database import get_db
-from src.core.exceptions import NotFoundError
+from src.core.exceptions import NotFoundError, BusinessLogicError
 from src.core.logging import get_logger
-from src.models.chapter import Chapter
+from src.models.chapter import Chapter, ChapterStatus
 from src.models.user import User
 from src.services.project import ProjectService
 from src.tasks.task import generate_prompts as generate_prompts_task
@@ -47,6 +47,9 @@ async def generate_prompts(
             resource_type="chapter",
             resource_id=str(request.chapter_id)
         )
+
+    if chapter.status != ChapterStatus.CONFIRMED.value:
+        raise BusinessLogicError(message=f"任务当前状态为：{chapter.status}")
 
     # 验证项目权限
     project_service = ProjectService(db)

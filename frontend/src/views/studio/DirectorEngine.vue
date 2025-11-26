@@ -2,7 +2,7 @@
   <div class="director-mode">
     <div class="toolbar">
       <el-form :inline="true" class="filter-form">
-        <el-form-item label="选择章节">
+        <el-form-item label="选择章节" style="width: 250px">
           <el-select v-model="selectedChapterId" placeholder="请选择已确认的章节" @change="loadSentences">
             <el-option
               v-for="chapter in chapters"
@@ -13,18 +13,18 @@
           </el-select>
         </el-form-item>
         
-        <el-form-item label="API Key">
+        <el-form-item label="API Key" style="width: 250px">
           <el-select v-model="selectedApiKey" placeholder="选择API Key">
             <el-option
               v-for="key in apiKeys"
               :key="key.id"
               :label="key.name + ' (' + key.provider + ')'"
-              :value="key.key"
+              :value="key.id"
             />
           </el-select>
         </el-form-item>
         
-        <el-form-item label="风格">
+        <el-form-item label="风格" style="width: 250px">
           <el-select v-model="selectedStyle" placeholder="选择风格">
             <el-option label="电影质感 (Cinematic)" value="cinematic" />
             <el-option label="二次元 (Anime)" value="anime" />
@@ -71,6 +71,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import chaptersService from '@/services/chapters'
+import apiKeysService from '@/services/apiKeys'
 import api from '@/services/api'
 
 const route = useRoute()
@@ -112,12 +113,8 @@ const loadChapters = async () => {
 
 // 加载API Keys (模拟，实际应从API获取)
 const loadApiKeys = async () => {
-  // TODO: 调用真实的API Key列表接口
-  // 这里暂时硬编码用于演示，或者从localStorage读取
-  apiKeys.value = [
-    { id: '1', name: 'My Volcengine', provider: 'volcengine', key: 'sk-placeholder' },
-    { id: '2', name: 'My DeepSeek', provider: 'deepseek', key: 'sk-placeholder' }
-  ]
+  const res = await apiKeysService.getAPIKeys()
+  apiKeys.value = res.api_keys || []
 }
 
 // 加载句子 - 使用优化的批量接口
@@ -149,13 +146,12 @@ const generatePrompts = async () => {
     // 调用新API - 使用正确的端点和请求格式
     const response = await api.post('/prompt/generate-prompts', {
       chapter_id: selectedChapterId.value,
-      api_key: selectedApiKey.value,
-      provider: 'volcengine', // 暂时硬编码，应从selectedApiKey中获取
+      api_key_id: selectedApiKey.value,
       style: selectedStyle.value
     })
     
-    if (response.data.success) {
-      ElMessage.success(response.data.message)
+    if (response.success) {
+      ElMessage.success(response.message)
       await loadSentences() // 重新加载以显示生成的Prompt
     }
   } catch (error) {

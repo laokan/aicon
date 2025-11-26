@@ -176,13 +176,14 @@ export const apiKeyUtils = {
      */
     getProviderOptions() {
         return [
-            { label: 'OpenAI', value: 'openai' },
-            { label: 'Azure OpenAI', value: 'azure' },
-            { label: 'Google AI', value: 'google' },
-            { label: '百度文心', value: 'baidu' },
-            { label: '阿里云', value: 'alibaba' },
+            // { label: 'OpenAI', value: 'openai' },
+            // { label: 'Azure OpenAI', value: 'azure' },
+            // { label: 'Google AI', value: 'google' },
+            // { label: '百度文心', value: 'baidu' },
+            // { label: '阿里云', value: 'alibaba' },
             { label: '火山引擎', value: 'volcengine' },
-            { label: '自定义', value: 'custom' }
+            { label: 'deepseek', value: 'deepseek' },
+            // { label: '自定义', value: 'custom' }
         ]
     },
 

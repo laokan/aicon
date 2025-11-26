@@ -63,6 +63,11 @@ api.interceptors.response.use(
           ElMessage.error('请求的资源不存在')
           break
 
+        case 400:
+          // 业务错误
+          ElMessage.error(data.message)
+          break
+
         case 422:
           // 表单验证错误
           if (data.detail && Array.isArray(data.detail)) {

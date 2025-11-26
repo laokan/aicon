@@ -16,16 +16,16 @@ class APIKeyCreate(BaseModel):
     provider: str = Field(..., min_length=1, max_length=50, description="服务提供商")
     api_key: str = Field(..., min_length=1, description="API密钥")
     base_url: Optional[str] = Field(None, max_length=500, description="API基础URL")
-    
+
     @field_validator('provider')
     @classmethod
     def validate_provider(cls, v: str) -> str:
         """验证服务提供商"""
-        valid_providers = ['openai', 'azure', 'google', 'baidu', 'alibaba', 'volcengine', 'custom']
+        valid_providers = ['openai', 'azure', 'google', 'baidu', 'alibaba', 'volcengine', 'custom', 'deepseek']
         if v.lower() not in valid_providers:
             raise ValueError(f"无效的服务提供商。支持的提供商: {', '.join(valid_providers)}")
         return v.lower()
-    
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -43,7 +43,7 @@ class APIKeyUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="密钥名称")
     base_url: Optional[str] = Field(None, max_length=500, description="API基础URL")
     status: Optional[str] = Field(None, description="密钥状态")
-    
+
     @field_validator('status')
     @classmethod
     def validate_status(cls, v: Optional[str]) -> Optional[str]:
@@ -54,7 +54,7 @@ class APIKeyUpdate(BaseModel):
                 raise ValueError(f"无效的状态。支持的状态: {', '.join(valid_statuses)}")
             return v.lower()
         return v
-    
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -79,9 +79,9 @@ class APIKeyResponse(UUIDMixin):
     usage_count: int = Field(0, description="使用次数")
     created_at: str = Field(..., description="创建时间")
     updated_at: str = Field(..., description="更新时间")
-    
+
     model_config = {"from_attributes": True}
-    
+
     @classmethod
     def from_dict(cls, data: dict, mask_key: bool = True) -> "APIKeyResponse":
         """从字典创建响应对象，处理时间格式和密钥遮罩"""
@@ -95,13 +95,13 @@ class APIKeyResponse(UUIDMixin):
                     pass
                 else:
                     data[field] = str(data[field])
-        
+
         # 确保api_key字段存在（应该已经是遮罩的）
         if 'api_key' not in data or not data['api_key']:
             data['api_key'] = '****'
-        
+
         return cls(**data)
-    
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -124,7 +124,7 @@ class APIKeyResponse(UUIDMixin):
 class APIKeyListResponse(PaginatedResponse):
     """API密钥列表响应模型"""
     api_keys: List[APIKeyResponse] = Field(..., description="API密钥列表")
-    
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -151,7 +151,7 @@ class APIKeyDeleteResponse(BaseModel):
     success: bool = Field(True, description="删除是否成功")
     message: str = Field("删除成功", description="响应消息")
     key_id: UUID = Field(..., description="删除的密钥ID")
-    
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -172,7 +172,7 @@ class APIKeyUsageResponse(BaseModel):
     last_used_at: Optional[str] = Field(None, description="最后使用时间")
     status: str = Field(..., description="当前状态")
     created_at: str = Field(..., description="创建时间")
-    
+
     model_config = {
         "json_schema_extra": {
             "example": {
