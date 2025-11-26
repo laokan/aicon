@@ -56,7 +56,7 @@ async def generate_prompts(
     await project_service.get_project_by_id(chapter.project_id, current_user.id)
 
     # 2. 投递任务到celery
-    result = generate_prompts_task.delay(chapter.id.hex, request.api_key_id.hex)
+    result = generate_prompts_task.delay(chapter.id.hex, request.api_key_id.hex, request.style)
 
     # 3.更新章节状态为提示词生成中
     chapter.status = "generating_prompts"

@@ -202,7 +202,10 @@ class PromptService(SessionManagedService):
         return base_prompt + f"风格要求：{style_suffix}"
 
 
-__all__ = ["PromptService"]
+prompt_service = PromptService()
+
+
+__all__ = ["PromptService","prompt_service"]
 
 if __name__ == "__main__":
     import asyncio

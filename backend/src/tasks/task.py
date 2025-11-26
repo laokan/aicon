@@ -20,6 +20,7 @@ from celery import Celery
 from src.core.config import settings
 from src.core.logging import get_logger
 from src.services.project_processing import project_processing_service
+from src.services.prompt import prompt_service
 
 logger = get_logger(__name__)
 
@@ -155,10 +156,24 @@ def retry_failed_project(self, project_id: str, owner_id: str) -> Dict[str, Any]
     retry_jitter=True,
     name="generate.generate_prompts"
 )
-def generate_prompts(self, chapter_id: str, api_key_id: str) -> Dict[str, Any]:
-    # TODO
-    logger.info(f"接收到：{chapter_id},key_id{api_key_id}")
-    pass
+def generate_prompts(self, chapter_id: str, api_key_id: str, style: str):
+    """"
+    为章节生成提示词的 Celery 任务
+
+    该任务仅负责调用服务层的提示词生成逻辑，不包含业务逻辑。
+
+    Args:
+        chapter_id: 章节ID
+        api_key_id: API密钥ID
+        style: 提示词风格
+
+    Returns:
+        Dict[str, Any]: 生成结果
+    """
+    logger.info(f"Celery任务开始: generate_prompts (chapter_id={chapter_id})")
+    # 使用辅助函数运行异步任务
+    result = run_async_task(prompt_service.generate_prompts_task(chapter_id, api_key_id, style))
+    logger.info(f"Celery任务成功: generate_prompts (chapter_id={chapter_id})")
 
 
 # ---------------------------
