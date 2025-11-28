@@ -31,3 +31,21 @@ class DeepSeekProvider(BaseLLMProvider):
                 messages=messages,
                 **kwargs
             )
+    
+    async def generate_image(
+            self,
+            prompt: str,
+            model: str = None,
+            **kwargs: Any
+    ):
+        """
+        调用 DeepSeek images.generate（纯粹透传）
+        """
+        
+        # 用 semaphore 限制并发
+        async with self.semaphore:
+            return await self.client.images.generate(
+                model=model or "deepseek-r1",
+                prompt=prompt,
+                **kwargs
+            )

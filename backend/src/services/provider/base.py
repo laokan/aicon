@@ -9,7 +9,7 @@ class BaseLLMProvider(ABC):
     纯粹 LLM Provider 接口。
     不参杂任何业务、文本处理、拼接逻辑。
 
-    所有 Provider 都必须实现 complet() 方法。
+    所有 Provider 都必须实现 completions() 方法。
     """
 
     @abstractmethod
@@ -21,5 +21,17 @@ class BaseLLMProvider(ABC):
     ) -> Any:
         """
         LLM 的 completions 调用（纯粹透传）
+        """
+        pass
+
+    @abstractmethod
+    async def generate_image(
+            self,
+            prompt: str,
+            model: str = None,
+            **kwargs: Any
+    ) -> Any:
+        """
+        生成图像的调用（纯粹透传）
         """
         pass

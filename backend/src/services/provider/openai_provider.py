@@ -40,3 +40,21 @@ class OpenAIProvider(BaseLLMProvider):
                 messages=messages,
                 **kwargs
             )
+    
+    async def generate_image(
+            self,
+            prompt: str,
+            model: str = None,
+            **kwargs: Any
+    ):
+        """
+        调用 OpenAI images.generate（纯粹透传）
+        """
+        
+        # 用 semaphore 限制并发
+        async with self.semaphore:
+            return await self.client.images.generate(
+                model=model or "dall-e-3",
+                prompt=prompt,
+                **kwargs
+            )

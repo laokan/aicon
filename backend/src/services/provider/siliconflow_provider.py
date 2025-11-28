@@ -1,4 +1,4 @@
-# src/services/providers/volcengine_provider.py
+# src/services/providers/siliconflow_provider.py
 
 import asyncio
 from typing import Any, Dict, List
@@ -6,22 +6,23 @@ from openai import AsyncOpenAI
 
 from .base import BaseLLMProvider
 
-class VolcengineProvider(BaseLLMProvider):
+
+class SiliconFlowProvider(BaseLLMProvider):
     """
-    火山方舟（Doubao）Provider，兼容 OpenAI SDK。
+    纯净 SiliconFlow Provider，不含任何业务逻辑。
 
-    使用示例：
-        client.chat.completions.create(model=..., messages=[...])
+    - 不拼接 prompt
+    - 不封装风格
+    - 不理解句子
+    - 不处理提示词生成
 
-    base_url 使用火山兼容 OpenAI API 的地址：
-        https://ark.cn-beijing.volces.com/api/v3
+    只提供 completions() 和 generate_image() 接口 → 等同于一个可并发的 SiliconFlow SDK wrapper
     """
 
-    def __init__(self, api_key: str, max_concurrency: int = 5):
-        # 关键：使用 OpenAI SDK，设置 base_url
+    def __init__(self, api_key: str, max_concurrency: int = 5, base_url: str = "https://api.siliconflow.cn/v1"):
         self.client = AsyncOpenAI(
             api_key=api_key,
-            base_url="https://ark.cn-beijing.volces.com/api/v3"
+            base_url=base_url
         )
         self.semaphore = asyncio.Semaphore(max_concurrency)
 
@@ -32,8 +33,10 @@ class VolcengineProvider(BaseLLMProvider):
             **kwargs: Any
     ):
         """
-        调用火山方舟兼容 OpenAI 的 completions 接口
+        调用 SiliconFlow chat.completions.create（纯粹透传）
         """
+
+        # 用 semaphore 限制并发
         async with self.semaphore:
             return await self.client.chat.completions.create(
                 model=model,
@@ -48,13 +51,13 @@ class VolcengineProvider(BaseLLMProvider):
             **kwargs: Any
     ):
         """
-        调用火山方舟兼容 OpenAI 的 images.generate 接口
+        调用 SiliconFlow images.generate（纯粹透传）
         """
         
         # 用 semaphore 限制并发
         async with self.semaphore:
             return await self.client.images.generate(
-                model=model or "volcengine-image-model",
+                model=model or "Kwai-Kolors/Kolors",
                 prompt=prompt,
                 **kwargs
             )
