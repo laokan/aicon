@@ -40,13 +40,7 @@ class Paragraph(BaseModel):
 
     # 编辑控制
     action = Column(String(10), default=ParagraphAction.KEEP, index=True, comment="操作类型")
-    edited_content = Column(Text, nullable=True, comment="编辑后的内容")
     is_confirmed = Column(Boolean, default=False, comment="是否已确认")
-    ignore_reason = Column(Text, nullable=True, comment="忽略原因")
-
-    # 生成信息
-    audio_url = Column(String(500), nullable=True, comment="段落音频URL")
-    audio_duration = Column(Integer, nullable=True, comment="音频时长（秒）")
 
     # 关系定义
     chapter = relationship("Chapter", back_populates="paragraphs")

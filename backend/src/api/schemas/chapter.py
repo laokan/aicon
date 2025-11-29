@@ -31,8 +31,6 @@ class ChapterUpdate(BaseModel):
     """更新章节请求模型"""
     title: Optional[str] = Field(None, min_length=1, max_length=500, description="章节标题")
     content: Optional[str] = Field(None, min_length=1, description="章节原始内容")
-    edited_content: Optional[str] = Field(None, description="用户编辑后的内容")
-    editing_notes: Optional[str] = Field(None, max_length=1000, description="编辑备注")
     chapter_number: Optional[int] = Field(None, ge=1, description="章节序号")
 
     model_config = {
@@ -60,9 +58,6 @@ class ChapterResponse(UUIDMixin):
     status: str = Field(..., description="处理状态")
     is_confirmed: bool = Field(False, description="是否已确认")
     confirmed_at: Optional[str] = Field(None, description="确认时间")
-    edited_content: Optional[str] = Field(None, description="用户编辑后的内容")
-    editing_notes: Optional[str] = Field(None, description="编辑备注")
-    generation_settings: Optional[str] = Field(None, description="章节级生成配置")
     video_url: Optional[str] = Field(None, description="最终视频URL")
     video_duration: Optional[int] = Field(None, description="视频时长（秒）")
     created_at: str = Field(..., description="创建时间")

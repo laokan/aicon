@@ -51,12 +51,7 @@ class Project(BaseModel):
     processing_progress = Column(Integer, default=0, comment="0-100处理进度")
     error_message = Column(Text, nullable=True, comment="错误信息")
 
-    # 生成配置 - 按照data-model.md规范
-    generation_settings = Column(Text, nullable=True, comment="JSON格式存储生成配置")
-
-    # 时间戳 - 按照data-model.md规范
-    completed_at = Column(DateTime, nullable=True, comment="完成时间")
-
+  
     # 关系定义 - 按照data-model.md规范
     chapters = relationship("Chapter", back_populates="project", cascade="all, delete-orphan")
     # generation_tasks = relationship("GenerationTask", back_populates="project", cascade="all, delete-orphan")
@@ -69,21 +64,7 @@ class Project(BaseModel):
         Index('idx_project_file_hash', 'file_hash'),
     )
 
-    def get_generation_settings(self) -> Dict[str, Any]:
-        """获取生成配置 - 按照data-model.md规范"""
-        if self.generation_settings:
-            import json
-            try:
-                return json.loads(self.generation_settings)
-            except (json.JSONDecodeError, TypeError):
-                return {}
-        return {}
-
-    def set_generation_settings(self, config: Dict[str, Any]) -> None:
-        """设置生成配置 - 按照data-model.md规范"""
-        import json
-        self.generation_settings = json.dumps(config) if config else None
-
+  
     def update_processing_progress(self, progress: int) -> None:
         """更新处理进度 - 按照data-model.md规范"""
         self.processing_progress = max(0, min(100, progress))
@@ -99,7 +80,6 @@ class Project(BaseModel):
         self.status = ProjectStatus.COMPLETED
         self.processing_progress = 100
         self.error_message = None
-        self.completed_at = datetime.utcnow()
 
     def can_be_processed(self) -> bool:
         """检查是否可以进行处理 - 按照data-model.md规范"""

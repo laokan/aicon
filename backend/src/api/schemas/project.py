@@ -69,8 +69,6 @@ class ProjectResponse(UUIDMixin):
     status: str = Field(..., description="项目状态")
     processing_progress: int = Field(0, description="处理进度（百分比）")
     error_message: Optional[str] = Field(None, description="错误信息")
-    generation_settings: Optional[str] = Field(None, description="生成设置（JSON）")
-    completed_at: Optional[str] = Field(None, description="完成时间")
     created_at: str = Field(..., description="创建时间")
     updated_at: str = Field(..., description="更新时间")
 

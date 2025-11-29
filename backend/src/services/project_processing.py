@@ -203,7 +203,6 @@ class ProjectProcessingService(SessionManagedService):
             project.word_count = 0
             project.processing_progress = 0
             project.error_message = None
-            project.completed_at = None
             await self.flush()
 
         logger.info(f"项目 {project_id} 数据清理完成")
@@ -228,7 +227,6 @@ class ProjectProcessingService(SessionManagedService):
             project.error_message = error_message
         elif status == ProjectStatus.PARSED:
             project.error_message = None
-            project.completed_at = datetime.utcnow()
 
         await self.flush()
         logger.debug(f"更新项目状态: ID={project.id}, 状态={status.value}, 进度={progress}%")
@@ -538,7 +536,6 @@ class ProjectProcessingService(SessionManagedService):
                     "error_message": project.error_message,
                     "created_at": project.created_at.isoformat() if project.created_at else None,
                     "updated_at": project.updated_at.isoformat() if project.updated_at else None,
-                    "completed_at": project.completed_at.isoformat() if project.completed_at else None,
                 }
 
                 logger.debug(f"项目 {project_id} 状态查询: {project.status} ({response['progress']}%)")
@@ -559,7 +556,6 @@ class ProjectProcessingService(SessionManagedService):
                 "error_message": str(e),
                 "created_at": None,
                 "updated_at": None,
-                "completed_at": None,
             }
 
     def _get_status_message(self, status: str) -> str:

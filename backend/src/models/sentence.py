@@ -46,31 +46,8 @@ class Sentence(BaseModel):
     image_style = Column(String(100), nullable=True, comment="图片风格")
     audio_url = Column(String(500), nullable=True, comment="生成的音频URL")
 
-    # 时间轴信息（来自ASR）
-    start_time = Column(Float, nullable=True, comment="音频开始时间（秒）")
-    end_time = Column(Float, nullable=True, comment="音频结束时间（秒）")
-    duration = Column(Float, nullable=True, comment="音频时长（秒）")
-    confidence_score = Column(Float, nullable=True, comment="ASR置信度")
-
-    # 语音设置
-    voice_settings = Column(Text, nullable=True, comment="JSON格式的语音合成参数")
-    voice_type = Column(String(50), nullable=True, comment="语音类型")
-    speech_rate = Column(Float, default=1.0, comment="语速")
-    pitch = Column(Float, default=1.0, comment="音调")
-    volume = Column(Float, default=1.0, comment="音量")
-
     # 处理状态
     status = Column(String(20), default=SentenceStatus.PENDING, index=True, comment="处理状态")
-    error_message = Column(Text, nullable=True, comment="错误信息")
-    retry_count = Column(Integer, default=0, comment="重试次数")
-
-    # 用户编辑
-    edited_content = Column(Text, nullable=True, comment="编辑后的内容")
-    edited_prompt = Column(Text, nullable=True, comment="编辑后的提示词")
-    is_manual_edited = Column(Boolean, default=False, comment="是否手动编辑")
-
-    # 完成时间
-    completed_at = Column(DateTime, nullable=True, comment="完成时间")
 
     # 关系定义
     paragraph = relationship("Paragraph", back_populates="sentences")
@@ -80,8 +57,6 @@ class Sentence(BaseModel):
         Index('idx_sentence_paragraph', 'paragraph_id'),
         Index('idx_sentence_order', 'order_index'),
         Index('idx_sentence_status', 'status'),
-        Index('idx_sentence_start_time', 'start_time'),
-        Index('idx_sentence_end_time', 'end_time'),
     )
 
     def __repr__(self) -> str:
@@ -112,8 +87,6 @@ class Sentence(BaseModel):
             sentence_data['id'] = sentence_id
             sentence_data['paragraph_id'] = paragraph_ids[i]
             sentence_data.setdefault('status', SentenceStatus.PENDING.value)
-            sentence_data.setdefault('retry_count', 0)
-            sentence_data.setdefault('is_manual_edited', False)
             sentence_ids.append(sentence_id)
 
         # 批量插入

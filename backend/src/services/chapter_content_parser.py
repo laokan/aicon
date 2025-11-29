@@ -95,8 +95,6 @@ class ChapterContentParser:
                     "word_count": len(sentence_text.replace(' ', '')),
                     "character_count": len(sentence_text),
                     "status": SentenceStatus.PENDING.value,
-                    "retry_count": 0,
-                    "is_manual_edited": False,
                 }
                 sentences_data.append(sentence_data)
 

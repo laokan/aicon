@@ -29,16 +29,12 @@ class ParagraphUpdate(BaseModel):
     """更新段落请求模型"""
     content: Optional[str] = Field(None, min_length=1, description="段落内容")
     action: Optional[str] = Field(None, description="操作类型: keep, edit, delete, ignore")
-    edited_content: Optional[str] = Field(None, description="编辑后的内容")
-    ignore_reason: Optional[str] = Field(None, max_length=500, description="忽略原因")
-
+    
     model_config = {
         "json_schema_extra": {
             "example": {
                 "content": "更新后的段落内容",
                 "action": "edit",
-                "edited_content": "编辑后的内容",
-                "ignore_reason": None
             }
         }
     }
@@ -53,11 +49,7 @@ class ParagraphResponse(UUIDMixin):
     word_count: int = Field(0, description="字数统计")
     sentence_count: int = Field(0, description="句子数量")
     action: str = Field("keep", description="操作类型")
-    edited_content: Optional[str] = Field(None, description="编辑后的内容")
     is_confirmed: bool = Field(False, description="是否已确认")
-    ignore_reason: Optional[str] = Field(None, description="忽略原因")
-    audio_url: Optional[str] = Field(None, description="段落音频URL")
-    audio_duration: Optional[int] = Field(None, description="音频时长（秒）")
     created_at: str = Field(..., description="创建时间")
     updated_at: str = Field(..., description="更新时间")
 
@@ -85,9 +77,7 @@ class ParagraphBatchUpdateItem(BaseModel):
     id: str = Field(..., description="段落ID")
     content: Optional[str] = Field(None, description="段落内容")
     action: Optional[str] = Field(None, description="操作类型")
-    edited_content: Optional[str] = Field(None, description="编辑后的内容")
-    ignore_reason: Optional[str] = Field(None, description="忽略原因")
-
+    
 
 class ParagraphBatchUpdate(BaseModel):
     """批量更新段落请求模型"""

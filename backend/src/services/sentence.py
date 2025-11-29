@@ -121,13 +121,11 @@ class SentenceService(BaseService):
             sentence.character_count = len(content)
             # 重置状态为pending，因为内容变了可能需要重新生成
             sentence.status = SentenceStatus.PENDING.value
-            sentence.is_manual_edited = True
-        
+                    
         # 更新图片提示词不需要检查章节是否已确认
         if image_prompt is not None:
             sentence.image_prompt = image_prompt
-            sentence.is_manual_edited = True
-
+            
         await self.commit()
         await self.refresh(sentence)
 

@@ -56,7 +56,7 @@
         v-show="sentence.image_url"
       >
         <el-icon><Camera /></el-icon>
-        生成图片
+        重新生成图片
       </el-button>
     </div>
   </el-card>
@@ -144,7 +144,7 @@ const handleGenerateImage = async () => {
   })
   
   try {
-    const response = await api.post('/image/generate-image', {
+    const response = await api.post('/image/generate-images', {
       sentence_id: props.sentence.id
     })
     

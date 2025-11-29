@@ -50,12 +50,7 @@ class Chapter(BaseModel):
     is_confirmed = Column(Boolean, default=False, comment="是否已确认")
     confirmed_at = Column(DateTime, nullable=True, comment="确认时间")
 
-    # 编辑信息
-    edited_content = Column(Text, nullable=True, comment="用户编辑后的内容")
-    editing_notes = Column(Text, nullable=True, comment="编辑备注")
-
     # 生成信息
-    generation_settings = Column(Text, nullable=True, comment="章节级生成配置")
     video_url = Column(String(500), nullable=True, comment="最终视频URL")
     video_duration = Column(Integer, nullable=True, comment="视频时长（秒）")
 

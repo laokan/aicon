@@ -70,7 +70,6 @@ class ChapterDetection:
     start_position: int
     end_position: int
     detection_method: str  # regex, fallback
-    confidence_score: float = 0.0
 
 
 class ChapterDetector(ABC):
@@ -191,8 +190,7 @@ class RegexChapterDetector(ChapterDetector):
                 chapter_number=1,
                 start_position=0,
                 end_position=len(text),
-                detection_method="fallback",
-                confidence_score=0.5
+                detection_method="fallback"
             )]
 
         # 构建章节内容
@@ -221,8 +219,7 @@ class RegexChapterDetector(ChapterDetector):
                 chapter_number=chapter_number,
                 start_position=start_pos,
                 end_position=end_pos,
-                detection_method=chapter_info['method'],
-                confidence_score=chapter_info['confidence']
+                detection_method=chapter_info['method']
             ))
 
             chapter_number += 1
@@ -285,8 +282,7 @@ class RegexChapterDetector(ChapterDetector):
                     chapter_number=len(filtered_chapters) + 1,
                     start_position=chapter.start_position,
                     end_position=chapter.end_position,
-                    detection_method=chapter.detection_method,
-                    confidence_score=chapter.confidence_score
+                    detection_method=chapter.detection_method
                 )
                 volume_prefix = ""  # 清空前缀
             else:
@@ -297,8 +293,7 @@ class RegexChapterDetector(ChapterDetector):
                     chapter_number=len(filtered_chapters) + 1,
                     start_position=chapter.start_position,
                     end_position=chapter.end_position,
-                    detection_method=chapter.detection_method,
-                    confidence_score=chapter.confidence_score
+                    detection_method=chapter.detection_method
                 )
             
             filtered_chapters.append(chapter)
@@ -363,8 +358,7 @@ class TextParserService:
                         start_position=prev_pos,
                         end_position=pos,
                         detection_method="auto_split",
-                        confidence_score=0.6
-                    ))
+                                            ))
                     chapter_num += 1
                 prev_pos = pos
 
@@ -379,8 +373,7 @@ class TextParserService:
                     start_position=prev_pos,
                     end_position=len(text),
                     detection_method="auto_split",
-                    confidence_score=0.6
-                ))
+                                    ))
 
         return chapters
 
