@@ -502,13 +502,23 @@ class ChapterService(BaseService):
             f"删除章节成功: ID={chapter_id}, 标题={chapter.title}, 已删除 {paragraph_count} 个段落, {sentence_count} 个句子")
         return True
 
-    async def get_sentences(self, chapter_id: str, status: SentenceStatus = None) -> List[Sentence]:
+    async def get_sentences(
+            self, 
+            chapter_id: str, 
+            status: SentenceStatus = None,
+            has_prompt: Optional[bool] = None,
+            has_image: Optional[bool] = None,
+            has_audio: Optional[bool] = None
+    ) -> List[Sentence]:
         """
         获取章节的所有句子（一次性加载，用于导演引擎）
 
         Args:
             chapter_id: 章节ID
             status: 章节状态过滤条件
+            has_prompt: 是否有提示词
+            has_image: 是否有图片
+            has_audio: 是否有音频
 
         Returns:
             List[Sentence]: 句子列表，每个句子包含 id 和 content 字段
@@ -528,6 +538,27 @@ class ChapterService(BaseService):
         # 如果需要，可以根据章节状态过滤句子（示例中未使用）
         if status:
             stmt = stmt.where(Sentence.status == status.value)
+            
+        # 提示词过滤
+        if has_prompt is not None:
+            if has_prompt:
+                stmt = stmt.where(Sentence.image_prompt.isnot(None), Sentence.image_prompt != "")
+            else:
+                stmt = stmt.where(or_(Sentence.image_prompt.is_(None), Sentence.image_prompt == ""))
+                
+        # 图片过滤
+        if has_image is not None:
+            if has_image:
+                stmt = stmt.where(Sentence.image_url.isnot(None), Sentence.image_url != "")
+            else:
+                stmt = stmt.where(or_(Sentence.image_url.is_(None), Sentence.image_url == ""))
+                
+        # 音频过滤
+        if has_audio is not None:
+            if has_audio:
+                stmt = stmt.where(Sentence.audio_url.isnot(None), Sentence.audio_url != "")
+            else:
+                stmt = stmt.where(or_(Sentence.audio_url.is_(None), Sentence.audio_url == ""))
 
         result = await self.execute(stmt)
         sentences = result.scalars().all()

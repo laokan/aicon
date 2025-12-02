@@ -24,20 +24,41 @@
 
     <div class="toolbar">
       <el-form :inline="true" class="filter-form">
-        <el-form-item label="选择章节" style="width: 300px">
+        <el-form-item label="选择章节" style="width: 240px">
           <el-select v-model="selectedChapterId" placeholder="请选择已确认的章节" @change="loadSentences">
             <el-option
               v-for="chapter in chapters"
               :key="chapter.id"
-              :label="`第${chapter.chapter_number}章: ${chapter.title} (${chapter.status})`"
+              :label="`第${chapter.chapter_number}章: ${chapter.title}`"
               :value="chapter.id"
             />
           </el-select>
         </el-form-item>
+
+        <el-form-item label="提示词" style="width: 120px">
+          <el-select v-model="filterHasPrompt" placeholder="全部" clearable @change="loadSentences">
+            <el-option label="已生成" value="true" />
+            <el-option label="未生成" value="false" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="图片" style="width: 120px">
+          <el-select v-model="filterHasImage" placeholder="全部" clearable @change="loadSentences">
+            <el-option label="已生成" value="true" />
+            <el-option label="未生成" value="false" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="音频" style="width: 120px">
+          <el-select v-model="filterHasAudio" placeholder="全部" clearable @change="loadSentences">
+            <el-option label="已生成" value="true" />
+            <el-option label="未生成" value="false" />
+          </el-select>
+        </el-form-item>
         
-        <el-form-item v-if="selectedChapterId">
+        <div class="action-buttons" v-if="selectedChapterId">
           <el-button type="primary" @click="generatePromptsVisible = true">
-            批量生成图片提示词
+            批量生成提示词
           </el-button>
           <el-button type="warning"  @click="batchGenerateImagesVisible = true">
             批量生成图片
@@ -45,7 +66,7 @@
           <el-button type="success"  @click="batchGenerateAudioVisible = true">
             批量生成音频
           </el-button>
-        </el-form-item>
+        </div>
       </el-form>
       
       <!-- 生成提示词对话框 -->
@@ -84,7 +105,7 @@
     </div>
 
     <div class="content-area">
-      <el-empty v-if="!sentences.length" description="请选择章节以开始" />
+      <el-empty v-if="!sentences.length" description="暂无数据" />
       
       <div v-else class="card-grid">
         <SentenceCard
@@ -141,6 +162,9 @@ const {
   selectedChapterId,
   loading,
   loadingStates,
+  filterHasPrompt,
+  filterHasImage,
+  filterHasAudio,
   generatePromptsVisible,
   regeneratePromptsVisible,
   batchGenerateImagesVisible,
@@ -375,6 +399,11 @@ const handlePromptSave = (updatedSentence) => {
 
 .filter-form .el-form-item {
   margin-bottom: 0;
+}
+
+.action-buttons {
+  display: flex;
+  gap: var(--space-sm);
 }
 
 /* 响应式设计 */

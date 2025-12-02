@@ -20,6 +20,11 @@ export function useDirectorEngine(projectId) {
   const batchGenerateAudioVisible = ref(false)
   const selectedSentenceIds = ref([])
 
+  // 筛选状态
+  const filterHasPrompt = ref('')
+  const filterHasImage = ref('')
+  const filterHasAudio = ref('')
+
   // 加载已确认的章节
   const loadChapters = async () => {
     try {
@@ -42,7 +47,18 @@ export function useDirectorEngine(projectId) {
 
     loading.value = true
     try {
-      const response = await api.get(`/chapters/${selectedChapterId.value}/sentences`)
+      const params = {}
+      if (filterHasPrompt.value && filterHasPrompt.value !== '') {
+        params.has_prompt = filterHasPrompt.value === 'true'
+      }
+      if (filterHasImage.value && filterHasImage.value !== '') {
+        params.has_image = filterHasImage.value === 'true'
+      }
+      if (filterHasAudio.value && filterHasAudio.value !== '') {
+        params.has_audio = filterHasAudio.value === 'true'
+      }
+
+      const response = await api.get(`/chapters/${selectedChapterId.value}/sentences`, { params })
       sentences.value = response.sentences || []
 
       // 初始化加载状态
@@ -107,9 +123,13 @@ export function useDirectorEngine(projectId) {
     loading,
     loadingStates,
 
+    // 筛选状态
+    filterHasPrompt,
+    filterHasImage,
+    filterHasAudio,
+
     // 对话框状态
     generatePromptsVisible,
-    regeneratePromptsVisible,
     regeneratePromptsVisible,
     batchGenerateImagesVisible,
     batchGenerateAudioVisible,

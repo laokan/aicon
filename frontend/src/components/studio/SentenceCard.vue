@@ -6,17 +6,22 @@
     <template #header>
       <div class="card-header">
         <span class="card-index">#{{ index + 1 }}</span>
-        <el-dropdown @command="handlePromptAction">
-          <span class="el-dropdown-link">
-            <el-icon><Setting /></el-icon>
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="view">查看提示词</el-dropdown-item>
-              <el-dropdown-item command="edit">编辑提示词</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <div class="header-actions">
+          <el-tag v-if="sentence.image_prompt" size="small" type="info" effect="plain">提示词</el-tag>
+          <el-tag v-if="sentence.image_url" size="small" type="success" effect="plain">图片</el-tag>
+          <el-tag v-if="sentence.audio_url" size="small" type="warning" effect="plain">音频</el-tag>
+          <el-dropdown @command="handlePromptAction" trigger="click">
+            <span class="el-dropdown-link">
+              <el-icon><MoreFilled /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="view">查看提示词</el-dropdown-item>
+                <el-dropdown-item command="edit">编辑提示词</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </div>
     </template>
     
@@ -25,48 +30,50 @@
     </div>
     
     <div class="card-actions">
-      <el-button
-        type="primary"
-        :loading="loadingStates.generatingPrompt"
-        @click="handleRegeneratePrompt"
-        size="small"
-        v-show="sentence.image_prompt"
-      >
-        <el-icon><MagicStick /></el-icon>
-        重新生成提示词
-      </el-button>
+      <el-tooltip content="重新生成提示词" placement="top" :show-after="500">
+        <el-button
+          class="action-btn"
+          :class="{ 'has-content': sentence.image_prompt }"
+          :loading="loadingStates.generatingPrompt"
+          @click="handleRegeneratePrompt"
+          text
+        >
+          <el-icon><MagicStick /></el-icon>
+        </el-button>
+      </el-tooltip>
       
-      <el-button
-        type="success"
-        :loading="loadingStates.generatingAudio"
-        :disabled="!sentence.image_prompt"
-        @click="handleGenerateAudio"
-        size="small"
-      >
-        <el-icon><Microphone /></el-icon>
-        生成音频
-      </el-button>
+      <el-tooltip content="生成图片" placement="top" :show-after="500">
+        <el-button
+          class="action-btn"
+          :class="{ 'has-content': sentence.image_url }"
+          :loading="loadingStates.generatingImage"
+          :disabled="!sentence.image_prompt"
+          @click="handleGenerateImage"
+          text
+        >
+          <el-icon><Picture /></el-icon>
+        </el-button>
+      </el-tooltip>
       
-      <el-button
-        type="warning"
-        :loading="loadingStates.generatingImage"
-        :disabled="!sentence.image_prompt"
-        @click="handleGenerateImage"
-        size="small"
-        v-show="sentence.image_url"
-      >
-        <el-icon><Camera /></el-icon>
-        重新生成图片
-      </el-button>
+      <el-tooltip content="生成音频" placement="top" :show-after="500">
+        <el-button
+          class="action-btn"
+          :class="{ 'has-content': sentence.audio_url }"
+          :loading="loadingStates.generatingAudio"
+          :disabled="!sentence.image_prompt"
+          @click="handleGenerateAudio"
+          text
+        >
+          <el-icon><Microphone /></el-icon>
+        </el-button>
+      </el-tooltip>
     </div>
   </el-card>
 </template>
 
 <script setup>
-import { ref, defineProps, defineEmits } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Setting, MagicStick, Microphone, Camera } from '@element-plus/icons-vue'
-import api from '@/services/api'
+import { defineProps, defineEmits } from 'vue'
+import { MoreFilled, MagicStick, Microphone, Picture } from '@element-plus/icons-vue'
 
 const props = defineProps({
   sentence: {
@@ -117,16 +124,17 @@ const handleGenerateImage = () => {
 /* 卡片基础样式 */
 .sentence-card {
   background: #ffffff;
-  border: 1px solid #e0e0e0;
-  border-radius: 16px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: all var(--transition-normal);
+  display: flex;
+  flex-direction: column;
 }
 
 .sentence-card:hover {
-  border-color: #c0c0c0;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.06);
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
 
@@ -135,55 +143,45 @@ const handleGenerateImage = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 18px 22px;
-  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
-  border-bottom: 1px solid #e8e8e8;
-  position: relative;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .card-index {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
-  color: #202124;
-  background: #ffffff;
-  width: 24px;
-  height: 24px;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-  border: 1px solid #e0e0e0;
-  font-family: 'Google Sans', 'Roboto', sans-serif;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
 /* 下拉菜单样式 */
 .el-dropdown-link {
-  color: #5f6368;
+  color: var(--text-tertiary);
   cursor: pointer;
-  padding: 6px;
-  border-radius: 6px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 4px;
+  border-radius: var(--radius-base);
+  transition: all var(--transition-fast);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .el-dropdown-link:hover {
-  color: #1a73e8;
-  background: #f8f9fa;
-  border-color: #1a73e8;
-  box-shadow: 0 1px 3px rgba(26, 115, 232, 0.15);
+  color: var(--primary-color);
+  background: var(--bg-tertiary);
 }
 
 /* 卡片内容样式 */
 .card-content {
   padding: var(--space-lg);
+  flex: 1;
 }
 
 .sentence-text {
@@ -191,77 +189,38 @@ const handleGenerateImage = () => {
   font-size: var(--text-base);
   line-height: var(--leading-relaxed);
   margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  white-space: pre-wrap;
 }
 
 /* 卡片操作区域样式 */
 .card-actions {
   display: flex;
-  gap: var(--space-sm);
-  padding: var(--space-md) var(--space-lg);
+  justify-content: space-around;
+  padding: var(--space-sm) var(--space-lg);
   background: var(--bg-primary);
   border-top: 1px solid var(--border-primary);
 }
 
-.card-actions .el-button {
+.action-btn {
   flex: 1;
-  height: 36px;
-  font-size: var(--text-sm);
-  font-weight: 500;
+  height: 40px;
+  font-size: 18px;
+  color: var(--text-tertiary);
   border-radius: var(--radius-base);
-  border: 1px solid var(--border-primary);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  box-shadow: none;
   transition: all var(--transition-fast);
 }
 
-.card-actions .el-button:hover {
+.action-btn:hover:not(:disabled) {
   background: var(--bg-secondary);
-  border-color: var(--border-secondary);
-  box-shadow: none;
+  color: var(--primary-color);
 }
 
-.card-actions .el-button--primary {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
-  color: white;
+.action-btn.has-content {
+  color: var(--primary-color);
 }
 
-.card-actions .el-button--primary:hover {
-  background: var(--primary-hover);
-  border-color: var(--primary-hover);
-}
-
-.card-actions .el-button--success {
-  background: var(--success-color);
-  border-color: var(--success-color);
-  color: white;
-}
-
-.card-actions .el-button--success:hover {
-  background: var(--success-dark);
-  border-color: var(--success-dark);
-}
-
-.card-actions .el-button--warning {
-  background: var(--warning-color);
-  border-color: var(--warning-color);
-  color: white;
-}
-
-.card-actions .el-button--warning:hover {
-  background: var(--warning-dark);
-  border-color: var(--warning-dark);
-}
-
-.card-actions .el-button:disabled {
-  background: var(--bg-tertiary);
-  border-color: var(--border-primary);
-  color: var(--text-tertiary);
-  box-shadow: none;
+.action-btn:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
 }
 </style>

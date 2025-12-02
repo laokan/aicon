@@ -257,14 +257,22 @@ async def get_chapter_sentences(
         *,
         current_user: User = Depends(get_current_user_required),
         db: AsyncSession = Depends(get_db),
-        chapter_id: str
+        chapter_id: str,
+        has_prompt: Optional[bool] = Query(None, description="是否有提示词"),
+        has_image: Optional[bool] = Query(None, description="是否有图片"),
+        has_audio: Optional[bool] = Query(None, description="是否有音频")
 ):
     """获取章节的所有句子（一次性加载，用于导演引擎）"""
     from src.api.schemas.sentence import SentenceResponse
 
     chapter_service = ChapterService(db)
 
-    sentences = await chapter_service.get_sentences(chapter_id=chapter_id)
+    sentences = await chapter_service.get_sentences(
+        chapter_id=chapter_id,
+        has_prompt=has_prompt,
+        has_image=has_image,
+        has_audio=has_audio
+    )
 
     # 转换为响应模型
     sentence_responses = [SentenceResponse.from_dict(s.to_dict()) for s in sentences]
