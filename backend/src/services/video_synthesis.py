@@ -227,9 +227,11 @@ class VideoSynthesisService(SessionManagedService):
             # 4:3横屏（1080px高度）：字幕固定在y=900
             fixed_y_pos = 900
             
-            # 标点符号正则
+            # 标点符号正则（用于检测断句）
             import re
-            punctuation_pattern = r'[，。！？；、,\.!?;:\'"\(\)\[\]\{\}<>]'
+            split_pattern = r'[，。！？；、,\.!?;:\'"\(\)\[\]\{\}<>]'
+            # 仅用于移除显示的标点
+            remove_pattern = r'[，。！？；、,\.!?;:\'"\(\)\[\]\{\}<>]'
             
             filters = []
             segments = subtitle_data.get("segments", [])
@@ -244,22 +246,57 @@ class VideoSynthesisService(SessionManagedService):
                     
                     for w in words:
                         raw_word = w.get("word", "")
-                        # 移除标点，但保留文字
-                        clean_word = re.sub(punctuation_pattern, '', raw_word).strip()
+                        # 检查这个词是否包含标点符号（意味着小句结束）
+                        has_punctuation = bool(re.search(split_pattern, raw_word))
+                        
+                        # 移除标点用于显示和长度计算
+                        clean_word = re.sub(remove_pattern, '', raw_word).strip()
                         
                         if not clean_word:
+                            # 即使是纯标点，如果它标志着句子结束，也可能触发换行
+                            if has_punctuation and current_line_words:
+                                # 输出当前行
+                                line_text = "".join([x["text"] for x in current_line_words])
+                                start_time = current_line_words[0]["start"]
+                                end_time = current_line_words[-1]["end"]  # 使用上一个词的结束时间
+                                
+                                text_escaped = line_text.replace("'", "'\\\\\\''").replace(":", "\\:")
+                                
+                                filter_str = (
+                                    f"drawtext="
+                                    f"text='{text_escaped}':"
+                                    f"fontsize={font_size}:"
+                                    f"fontcolor={color}:"
+                                    f"borderw=5:"
+                                    f"bordercolor=black:"
+                                    f"shadowcolor=black@0.7:"
+                                    f"shadowx=4:"
+                                    f"shadowy=4:"
+                                    f"box=1:"
+                                    f"boxcolor=black@0.65:"
+                                    f"boxborderw=20:"
+                                    f"x=(w-text_w)/2:"
+                                    f"y={fixed_y_pos}:"
+                                    f"enable='between(t,{start_time:.3f},{end_time:.3f})'"
+                                )
+                                filters.append(filter_str)
+                                
+                                current_line_words = []
+                                current_line_len = 0
                             continue
                             
                         word_len = len(clean_word)
                         
-                        # 如果加上这个词会超过最大长度（18字），则先输出当前行
+                        # 换行条件：
+                        # 1. 加上当前词超过最大长度（18字）
+                        # 2. 或者前一个词带有标点（已在上一轮循环处理，但这里作为双重保障）
+                        # 注意：这里主要处理长度限制，标点断句在下面处理
                         if current_line_len + word_len > 18 and current_line_words:
-                            # 生成当前行的滤镜
+                            # 输出当前行
                             line_text = "".join([x["text"] for x in current_line_words])
                             start_time = current_line_words[0]["start"]
                             end_time = current_line_words[-1]["end"]
                             
-                            # 转义特殊字符
                             text_escaped = line_text.replace("'", "'\\\\\\''").replace(":", "\\:")
                             
                             filter_str = (
@@ -281,7 +318,6 @@ class VideoSynthesisService(SessionManagedService):
                             )
                             filters.append(filter_str)
                             
-                            # 重置行
                             current_line_words = []
                             current_line_len = 0
                         
@@ -292,6 +328,36 @@ class VideoSynthesisService(SessionManagedService):
                             "end": w.get("end", 0)
                         })
                         current_line_len += word_len
+                        
+                        # 如果当前词带有标点，且当前行不为空，则强制换行（小句结束）
+                        if has_punctuation and current_line_words:
+                            line_text = "".join([x["text"] for x in current_line_words])
+                            start_time = current_line_words[0]["start"]
+                            end_time = current_line_words[-1]["end"]
+                            
+                            text_escaped = line_text.replace("'", "'\\\\\\''").replace(":", "\\:")
+                            
+                            filter_str = (
+                                f"drawtext="
+                                f"text='{text_escaped}':"
+                                f"fontsize={font_size}:"
+                                f"fontcolor={color}:"
+                                f"borderw=5:"
+                                f"bordercolor=black:"
+                                f"shadowcolor=black@0.7:"
+                                f"shadowx=4:"
+                                f"shadowy=4:"
+                                f"box=1:"
+                                f"boxcolor=black@0.65:"
+                                f"boxborderw=20:"
+                                f"x=(w-text_w)/2:"
+                                f"y={fixed_y_pos}:"
+                                f"enable='between(t,{start_time:.3f},{end_time:.3f})'"
+                            )
+                            filters.append(filter_str)
+                            
+                            current_line_words = []
+                            current_line_len = 0
                     
                     # 处理最后一行
                     if current_line_words:
@@ -323,32 +389,53 @@ class VideoSynthesisService(SessionManagedService):
                 else:
                     # 没有词级时间轴，使用比例计算时间（回退方案）
                     text = segment.get("text", "").strip()
-                    # 移除标点
-                    clean_text = re.sub(punctuation_pattern, '', text).strip()
-                    
-                    if not clean_text:
+                    if not text:
                         continue
+                        
+                    # 优先按标点分割
+                    # 使用正则保留分隔符，以便知道在哪里分割的
+                    parts = re.split(f'({split_pattern})', text)
+                    lines = []
+                    current_part = ""
                     
-                    # 智能分割
-                    lines = self._split_text_into_lines(clean_text, max_chars=18)
+                    for part in parts:
+                        # 如果是标点
+                        if re.match(split_pattern, part):
+                            if current_part:
+                                lines.append(current_part)
+                                current_part = ""
+                        else:
+                            # 如果是文字
+                            if len(current_part) + len(part) > 18:
+                                if current_part:
+                                    lines.append(current_part)
+                                current_part = part
+                            else:
+                                current_part += part
                     
+                    if current_part:
+                        lines.append(current_part)
+                    
+                    # 移除每行中的标点
+                    clean_lines = [re.sub(remove_pattern, '', line).strip() for line in lines if re.sub(remove_pattern, '', line).strip()]
+                    
+                    if not clean_lines:
+                        continue
+                        
                     segment_start = segment.get("start", 0)
                     segment_end = segment.get("end", 0)
                     total_duration = segment_end - segment_start
-                    total_length = len(clean_text.replace(" ", ""))
+                    total_length = len("".join(clean_lines))
                     
                     current_start = segment_start
                     
-                    for line_text in lines:
-                        if not line_text.strip():
-                            continue
-                        
+                    for line_text in clean_lines:
                         # 按长度比例计算持续时间
                         line_len = len(line_text)
                         if total_length > 0:
                             line_duration = total_duration * (line_len / total_length)
                         else:
-                            line_duration = total_duration / len(lines)
+                            line_duration = total_duration / len(clean_lines)
                             
                         line_end = current_start + line_duration
                         
