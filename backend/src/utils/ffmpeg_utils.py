@@ -167,21 +167,36 @@ def build_sentence_video_command(
     video_codec = gen_setting.get("video_codec", "libx264")
     audio_codec = gen_setting.get("audio_codec", "aac")
     audio_bitrate = gen_setting.get("audio_bitrate", "192k")
-    zoom_speed = gen_setting.get("zoom_speed", 0.0005)
+    zoom_speed = gen_setting.get("zoom_speed", 0.0003)  # 减慢缩放速度
 
     # 解析分辨率
     width, height = resolution.split('x')
 
     # 构建filter_complex
-    # 1. 图片缩放和裁剪
-    # 2. zoompan效果
+    # 1. 图片缩放 - 使用decrease保持完整图片，添加黑边
+    # 2. 轻微的Ken Burns效果（缩放）
     # 3. 字幕叠加
-    filter_complex = (
-        f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,"
-        f"crop={width}:{height},"
-        f"zoompan=z='zoom+{zoom_speed}':s={width}x{height}:d={fps}*{duration}[bg];"
-        f"[bg]{subtitle_filter}[v0]"
-    )
+    
+    # 计算总帧数
+    total_frames = int(fps * duration)
+    
+    if subtitle_filter:
+        # 有字幕时的滤镜链
+        filter_complex = (
+            f"[0:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,"  # 添加黑边居中
+            f"zoompan=z='min(zoom+{zoom_speed},1.2)':d={total_frames}:s={width}x{height}:fps={fps}[bg];"
+            f"[bg]{subtitle_filter}[v]"
+        )
+        map_video = "[v]"
+    else:
+        # 无字幕时的滤镜链
+        filter_complex = (
+            f"[0:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,"
+            f"zoompan=z='min(zoom+{zoom_speed},1.2)':d={total_frames}:s={width}x{height}:fps={fps}[v]"
+        )
+        map_video = "[v]"
 
     # 构建命令
     command = [
@@ -192,10 +207,11 @@ def build_sentence_video_command(
         "-i", image_path,  # 输入图片
         "-i", audio_path,  # 输入音频
         "-filter_complex", filter_complex,
-        "-map", "[v0]",  # 映射视频流
+        "-map", map_video,  # 映射视频流
         "-map", "1:a",  # 映射音频流
         "-c:v", video_codec,  # 视频编码器
-        "-preset", "veryfast",  # 编码预设
+        "-preset", "medium",  # 使用medium预设提高质量
+        "-crf", "23",  # 质量控制
         "-c:a", audio_codec,  # 音频编码器
         "-b:a", audio_bitrate,  # 音频比特率
         "-pix_fmt", "yuv420p",  # 像素格式

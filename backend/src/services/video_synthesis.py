@@ -161,7 +161,7 @@ class VideoSynthesisService(SessionManagedService):
             gen_setting: dict
     ) -> str:
         """
-        创建字幕滤镜
+        创建字幕滤镜（打字机效果 - 逐字累积显示）
 
         Args:
             subtitle_data: 字幕数据
@@ -172,39 +172,89 @@ class VideoSynthesisService(SessionManagedService):
         """
         try:
             subtitle_style = gen_setting.get("subtitle_style", {})
-            font = subtitle_style.get("font", "Arial")
-            font_size = subtitle_style.get("font_size", 48)
+            font_size = subtitle_style.get("font_size", 72)
             color = subtitle_style.get("color", "white")
             position = subtitle_style.get("position", "bottom")
 
             # 计算Y坐标
             if position == "bottom":
-                y_pos = "h-th-50"
+                y_pos = "h-th-80"
             elif position == "top":
-                y_pos = "50"
-            else:  # center
+                y_pos = "80"
+            else:
                 y_pos = "(h-th)/2"
 
-            # 构建drawtext滤镜
+            # 构建drawtext滤镜 - 打字机效果
             filters = []
             segments = subtitle_data.get("segments", [])
 
             for segment in segments:
-                text = segment.get("text", "").replace("'", "'\\\\\\''")  # 转义单引号
-                start = segment.get("start", 0)
-                end = segment.get("end", 0)
-
-                # 创建drawtext滤镜
-                filter_str = (
-                    f"drawtext=text='{text}':"
-                    f"fontfile=/Windows/Fonts/arial.ttf:"  # Windows字体路径
-                    f"fontsize={font_size}:"
-                    f"fontcolor={color}:"
-                    f"x=(w-text_w)/2:"
-                    f"y={y_pos}:"
-                    f"enable='between(t,{start},{end})'"
-                )
-                filters.append(filter_str)
+                words = segment.get("words", [])
+                
+                # 如果有词级时间轴，实现打字机效果
+                if words:
+                    accumulated_text = ""
+                    
+                    for idx, word_info in enumerate(words):
+                        word = word_info.get("word", "").strip()
+                        if not word:
+                            continue
+                        
+                        # 累积文本
+                        accumulated_text += word
+                        
+                        start = word_info.get("start", 0)
+                        # 结束时间是下一个词的开始时间，或者segment的结束时间
+                        if idx < len(words) - 1:
+                            end = words[idx + 1].get("start", word_info.get("end", 0))
+                        else:
+                            end = segment.get("end", word_info.get("end", 0))
+                        
+                        # 转义特殊字符
+                        text_escaped = accumulated_text.replace("'", "'\\\\\\''").replace(":", "\\:")
+                        
+                        # 创建drawtext滤镜 - 显示累积的文本
+                        filter_str = (
+                            f"drawtext="
+                            f"text='{text_escaped}':"
+                            f"fontsize={font_size}:"
+                            f"fontcolor={color}:"
+                            f"borderw=3:"
+                            f"bordercolor=black:"
+                            f"box=1:"
+                            f"boxcolor=black@0.5:"
+                            f"boxborderw=10:"
+                            f"x=(w-text_w)/2:"
+                            f"y={y_pos}:"
+                            f"enable='between(t,{start},{end})'"
+                        )
+                        filters.append(filter_str)
+                else:
+                    # 如果没有词级时间轴，显示整句
+                    text = segment.get("text", "").strip()
+                    if not text:
+                        continue
+                    
+                    start = segment.get("start", 0)
+                    end = segment.get("end", 0)
+                    
+                    text_escaped = text.replace("'", "'\\\\\\''").replace(":", "\\:")
+                    
+                    filter_str = (
+                        f"drawtext="
+                        f"text='{text_escaped}':"
+                        f"fontsize={font_size}:"
+                        f"fontcolor={color}:"
+                        f"borderw=3:"
+                        f"bordercolor=black:"
+                        f"box=1:"
+                        f"boxcolor=black@0.5:"
+                        f"boxborderw=10:"
+                        f"x=(w-text_w)/2:"
+                        f"y={y_pos}:"
+                        f"enable='between(t,{start},{end})'"
+                    )
+                    filters.append(filter_str)
 
             # 如果没有字幕，返回空滤镜
             if not filters:
@@ -215,7 +265,6 @@ class VideoSynthesisService(SessionManagedService):
 
         except Exception as e:
             logger.error(f"创建字幕滤镜失败: {e}")
-            # 返回空滤镜，不中断流程
             return ""
 
     async def _synthesize_sentence_video(
