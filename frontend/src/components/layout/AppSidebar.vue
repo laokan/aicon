@@ -83,7 +83,8 @@ import {
   Document,
   Promotion,
   Setting,
-  Key
+  Key,
+  Headset
 } from '@element-plus/icons-vue'
 
 // Props
@@ -121,6 +122,12 @@ const menuItems = [
     title: '视频生成',
     path: '/generation',
     icon: Document,
+    badge: null
+  },
+  {
+    title: '背景音乐',
+    path: '/bgm-management',
+    icon: Headset,
     badge: null
   },
   {

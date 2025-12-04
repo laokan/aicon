@@ -14,6 +14,7 @@ class VideoTaskCreate(BaseModel):
     """创建视频任务请求模型"""
     chapter_id: UUID = Field(..., description="章节ID")
     api_key_id: Optional[UUID] = Field(None, description="API密钥ID（可选，用于LLM字幕纠错）")
+    bgm_id: Optional[UUID] = Field(None, description="BGM ID（可选，用于背景音乐）")
     gen_setting: Optional[Dict] = Field(None, description="生成设置")
 
     model_config = {
@@ -28,6 +29,7 @@ class VideoTaskCreate(BaseModel):
                     "audio_codec": "aac",
                     "audio_bitrate": "192k",
                     "zoom_speed": 0.0005,
+                    "video_speed": 1.0,
                     "llm_model": "gpt-4o-mini",
                     "subtitle_style": {
                         "font": "Arial",

@@ -52,6 +52,7 @@ async def create_video_task(
         project_id=str(chapter.project_id),
         chapter_id=str(task_data.chapter_id),
         api_key_id=str(task_data.api_key_id) if task_data.api_key_id else None,
+        bgm_id=str(task_data.bgm_id) if task_data.bgm_id else None,
         gen_setting=task_data.gen_setting
     )
 

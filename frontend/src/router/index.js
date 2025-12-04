@@ -1,8 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { setupAuthGuard } from './guards'
+import { setupAuthGuard } from '@/router/guards'
 
 // 布局组件
-const AuthLayout = () => import('@/components/layout/AuthLayout.vue')
 const MainLayout = () => import('@/components/layout/MainLayout.vue')
 
 // 页面组件
@@ -10,8 +9,8 @@ const Login = () => import('@/views/Login.vue')
 const Register = () => import('@/views/Register.vue')
 const Dashboard = () => import('@/views/Dashboard.vue')
 const Projects = () => import('@/views/Projects.vue')
-const ProjectDetail = () => import('@/components/project/ProjectDetail.vue')
-// const GenerationQueue = () => import('@/views/GenerationQueue.vue')
+const ContentStudio = () => import('@/views/studio/ContentStudio.vue')
+const DirectorEngine = () => import('@/views/studio/DirectorEngine.vue')
 const GenerationSettings = () => import('@/views/GenerationSettings.vue')
 const Publish = () => import('@/views/Publish.vue')
 const APIKeys = () => import('@/views/APIKeys.vue')
@@ -19,43 +18,20 @@ const Settings = () => import('@/views/Settings.vue')
 
 const routes = [
   {
-    path: '/',
-    name: 'Home',
-    redirect: '/dashboard'
-  },
-  {
     path: '/login',
     name: 'Login',
-    component: AuthLayout,
-    meta: { requiresGuest: true },
-    children: [
-      {
-        path: '',
-        name: 'LoginPage',
-        component: Login,
-        props: {
-          title: '欢迎回来',
-          subtitle: '登录您的账户继续使用AI内容生成平台'
-        }
-      }
-    ]
+    component: Login,
+    meta: { requiresAuth: false }
   },
   {
     path: '/register',
     name: 'Register',
-    component: AuthLayout,
-    meta: { requiresGuest: true },
-    children: [
-      {
-        path: '',
-        name: 'RegisterPage',
-        component: Register,
-        props: {
-          title: '创建账户',
-          subtitle: '加入AICG平台，开始您的AI内容创作之旅'
-        }
-      }
-    ]
+    component: Register,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/',
+    redirect: '/dashboard'
   },
   {
     path: '/dashboard',
@@ -80,24 +56,32 @@ const routes = [
         path: '',
         name: 'ProjectsPage',
         component: Projects
-      },
+      }
+    ]
+  },
+  {
+    path: '/content-studio/:projectId/:chapterId?',
+    name: 'ContentStudio',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
       {
-        path: ':projectId',
-        name: 'ProjectDetail',
-        component: ProjectDetail,
-        props: true
-      },
+        path: '',
+        name: 'ContentStudioPage',
+        component: ContentStudio
+      }
+    ]
+  },
+  {
+    path: '/director-engine/:projectId/:chapterId',
+    name: 'DirectorEngine',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
       {
-        path: ':projectId/studio',
-        name: 'ContentStudio',
-        component: () => import('@/views/studio/ContentStudio.vue'),
-        props: true
-      },
-      {
-        path: ':projectId/director',
-        name: 'DirectorEngine',
-        component: () => import('@/views/studio/DirectorEngine.vue'),
-        props: true
+        path: '',
+        name: 'DirectorEnginePage',
+        component: DirectorEngine
       }
     ]
   },
@@ -150,6 +134,19 @@ const routes = [
         path: '',
         name: 'APIKeysPage',
         component: APIKeys
+      }
+    ]
+  },
+  {
+    path: '/bgm-management',
+    name: 'BGMManagement',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'BGMManagementPage',
+        component: () => import('@/views/BGMManagement.vue')
       }
     ]
   },

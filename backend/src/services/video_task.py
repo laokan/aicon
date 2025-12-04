@@ -38,6 +38,7 @@ class VideoTaskService(BaseService):
             project_id: str,
             chapter_id: str,
             api_key_id: Optional[str] = None,
+            bgm_id: Optional[str] = None,
             background_id: Optional[str] = None,
             gen_setting: Optional[dict] = None
     ) -> VideoTask:
@@ -62,7 +63,7 @@ class VideoTaskService(BaseService):
                 project_id=project_id,
                 chapter_id=chapter_id,
                 api_key_id=api_key_id,
-                background_id=background_id,
+                background_id=bgm_id or background_id,  # bgm_id优先
                 status=VideoTaskStatus.PENDING
             )
 
