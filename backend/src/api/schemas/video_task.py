@@ -58,6 +58,7 @@ class VideoTaskResponse(UUIDMixin):
     video_url: Optional[str] = Field(None, description="视频预签名URL")
     video_duration: Optional[int] = Field(None, description="视频时长（秒）")
     error_message: Optional[str] = Field(None, description="错误信息")
+    gen_setting: Optional[Dict] = Field(None, description="生成设置")
     created_at: str = Field(..., description="创建时间")
     updated_at: str = Field(..., description="更新时间")
     
@@ -80,6 +81,15 @@ class VideoTaskResponse(UUIDMixin):
                     pass
                 else:
                     data[field] = str(data[field])
+        
+        # 处理 gen_setting 字段（如果是字符串，解析为字典）
+        if 'gen_setting' in data and data['gen_setting'] is not None:
+            if isinstance(data['gen_setting'], str):
+                try:
+                    import json
+                    data['gen_setting'] = json.loads(data['gen_setting'])
+                except (json.JSONDecodeError, TypeError):
+                    data['gen_setting'] = {}
 
         return cls(**data)
 
