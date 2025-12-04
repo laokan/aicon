@@ -1,183 +1,433 @@
-# AI 驱动的智能内容创作与分发平台
+# 🎬 AICG - AI驱动的智能视频创作平台
 
-## 🚀 AICG Content Platform
+<div align="center">
 
-AI 驱动的智能内容创作与分发平台，致力于将**长文本自动转换为高质量的图文解说视频**（即“漫解视频”）。
+**将长文本自动转换为高质量图文解说视频的一站式解决方案**
 
-我们的目标是以**极低的成本和高效的工作流**，帮助用户快速生成媲美专业制作的解说视频。
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Node](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688.svg)](https://fastapi.tiangolo.com/)
+[![Vue](https://img.shields.io/badge/Vue-3.3+-4FC08D.svg)](https://vuejs.org/)
 
-### 🌟 核心亮点：低成本、高质量漫解视频
+[功能特性](#-核心功能) • [快速开始](#-快速开始) • [技术架构](#-技术架构) • [文档](#-文档)
 
-本平台支持集成第三方 API，通过灵活的模型组合，实现极具性价比的视频生成方案。
+</div>
 
-| 步骤 | 推荐模型/服务 | 成本优势/说明 |
-| :--- | :--- | :--- |
-| **1. 提示词** | 任意模型（如 GPT-4o, Claude 3.5 Sonnet） | 灵活选择，控制文本质量和成本。 |
-| **2. 音频 (TTS)** | **[硅基流动] index-tts2** | **高保真、情感丰富**的中文配音。 |
-| **3. 图像 (AI 绘画)** | **[第三方中转平台] sora\_image** | **极低成本！** 目前价格约为 **0.04 元/张**，高效生成漫解风格图片。 |
+---
 
-> 📢 **低成本提醒：** 利用第三方平台提供的 Sora\_Image 模型，可以将核心的图片生成成本控制在极低的水平，这是实现“漫解视频自由”的关键。
+## 🌟 项目亮点
 
-### 🔮 未来规划
+### 💰 极致性价比
+通过灵活的第三方API集成，实现**低至0.04元/张图片**的成本控制，让视频创作不再昂贵。
 
-| 领域 | 目标 |
-| :--- | :--- |
-| **内容一致性** | **角色一致性**：保持在整个视频中，主要人物形象的稳定。 |
-| **内容形式** | **生成动态漫画**：从静态图片升级到带有微小动作和运镜的动态画面。 |
-| **运镜优化** | **智能运镜**：引入电影级镜头语言，自动生成运镜脚本。 |
-| **可视化** | **可视化编排**：所见即所得的导演模式，精细控制每一帧画面、配音和字幕。 |
-| **分发** | **多平台分发**：一键发布到主流视频平台。 |
+### 🎯 全自动化流程
+从文本上传到视频生成，**一键完成**：
+- 📝 智能章节识别
+- 🎨 AI图片生成
+- 🗣️ 情感化语音合成
+- 🎬 自动视频剪辑
+- 📊 精准字幕同步
 
------
+### ⚡ 高效异步架构
+基于Celery的异步任务处理，支持：
+- 🚀 高并发批量生成
+- 💾 智能增量缓存
+- 📈 实时进度追踪
+- 🔄 断点续传
 
-## ✨ 核心特性
+### 🎛️ 专业级视频控制
+- **Ken Burns效果**：动态缩放和平移
+- **BGM混合**：可配置音量的背景音乐
+- **视频加速**：0.5x-2.0x速度调整
+- **LLM字幕纠错**：智能修正识别错误
+- **多分辨率支持**：竖屏/横屏/方形
 
-### 图文解说生成工作流
+---
 
-  * **🎨 AI 绘画 (Image Generation):**
-      * 集成 Flux、SDXL 等多模型，支持风格定制，满足多样化的视觉需求。
-  * **🗣️ AI 配音 (TTS):**
-      * 支持多种 TTS 引擎（如硅基流动 index-tts2），提供情感丰富、自然的中文配音。
-  * **🎬 自动合成 (Auto Composition):**
-      * 智能匹配画面与语音，自动完成视频剪辑和合成，并精准生成字幕。
+## ✨ 核心功能
 
-### 高效工作流架构
+### 📚 智能内容管理
 
-  * **🚀 异步处理:** 全链路采用异步架构（基于 Celery），支持高并发任务，提高视频生产效率。
-  * **💾 智能缓存:** 视频生成过程支持增量更新，智能缓存已生成的图片和音频，避免重复计算，节省 API 费用。
+<table>
+<tr>
+<td width="50%">
 
------
+#### 📂 项目与章节管理
+- ✅ 支持TXT、DOCX、PDF、EPUB等多格式
+- ✅ 智能章节识别与解析
+- ✅ 可视化章节编辑器
+- ✅ 章节合并/拆分/忽略
+- ✅ 实时预览与调整
 
-## 🛠️ 快速开始
+</td>
+<td width="50%">
 
-### ⚠️ **重要前提：API 平台账号注册**
+#### 🎯 导演引擎（Director Engine）
+- ✅ 批量生成提示词
+- ✅ 批量生成图片
+- ✅ 批量生成音频
+- ✅ 单句精细调整
+- ✅ 素材预览与替换
 
-由于本项目依赖第三方高性能 AI 模型，你需要注册并配置相应的 API 平台账号以获取调用凭证。
+</td>
+</tr>
+</table>
 
-1.  **[推荐] 硅基流动 (TTS/大模型):**
-      * **注册链接：** [https://cloud.siliconflow.cn/i/63zI7Mdc](https://cloud.siliconflow.cn/i/63zI7Mdc)
-2.  **[低成本图像] 第三方中转 API 平台 (Sora\_Image):**
-      * **注册链接：** [https://api.vectorengine.ai/register?aff=YVx7](https://api.vectorengine.ai/register?aff=YVx7)
-      * > **📢 注意：** 第三方中转平台可能存在不稳定情况，**强烈建议按需充值，用多少充多少。**
+### 🎨 AI素材生成
 
-### 1\. 环境要求
+<table>
+<tr>
+<td width="33%">
 
-  * **Node.js:** `>= 18.0.0`
-  * **Python:** `>= 3.11`
-  * **uv:** 最新版本 (Python 包管理器)
-  * **FFmpeg:** 最新版本 (视频处理必备)
-  * **Docker:** 最新版本 (用于基础设施服务)
+#### 🖼️ 图片生成
+- Flux系列模型
+- SDXL系列模型
+- Sora_Image（低成本）
+- 自定义模型支持
+- 风格一致性控制
 
-### 2\. 系统依赖安装
+</td>
+<td width="33%">
 
-**安装 FFmpeg (视频处理核心)**
+#### 🎤 语音合成
+- 硅基流动 index-tts2
+- 情感丰富的中文配音
+- 多种音色选择
+- 自然语音节奏
+- 高保真音质
 
-| 系统 | 安装命令 |
-| :--- | :--- |
-| Windows (Chocolatey) | `choco install ffmpeg` |
-| Windows (Scoop) | `scoop install ffmpeg` |
-| macOS (Homebrew) | `brew install ffmpeg` |
-| Ubuntu/Debian | `sudo apt update && sudo apt install ffmpeg` |
-| CentOS/RHEL | `sudo yum install epel-release && sudo yum install ffmpeg` |
+</td>
+<td width="33%">
 
-**安装 uv (Python 包管理器)**
+#### 🤖 LLM集成
+- GPT-4o系列
+- Claude 3.5系列
+- DeepSeek系列
+- 自定义模型
+- 字幕智能纠错
 
-| 平台 | 安装命令 |
-| :--- | :--- |
-| macOS/Linux | `curl -LsSf https://astral.sh/uv/install.sh | sh` |
-| 任意平台 (pip) | `pip install uv` |
+</td>
+</tr>
+</table>
 
-### 3\. 环境配置
+### 🎬 专业视频合成
+
+#### 🎥 视频生成特性
+
+| 功能 | 说明 | 配置项 |
+|------|------|--------|
+| **分辨率** | 竖屏(9:16)、横屏(16:9)、方形(1:1) | ✅ 可配置 |
+| **帧率** | 24/30/60 FPS | ✅ 可配置 |
+| **Ken Burns效果** | 动态缩放+平移，电影级运镜 | ✅ 可配置速度 |
+| **字幕样式** | 字体大小、颜色、位置 | ✅ 可配置 |
+| **BGM混合** | 背景音乐自动循环与混合 | ✅ 可配置音量(0-50%) |
+| **视频加速** | 0.5x-2.0x速度调整，保持音调 | ✅ 可配置 |
+| **LLM纠错** | 智能修正字幕错别字 | ✅ 可选启用 |
+
+#### 🔧 技术亮点
+
+```mermaid
+graph LR
+    A[文本] --> B[章节识别]
+    B --> C[提示词生成]
+    C --> D[图片生成]
+    C --> E[音频生成]
+    D --> F[单句视频合成]
+    E --> F
+    F --> G[视频拼接]
+    G --> H[视频加速]
+    H --> I[BGM混合]
+    I --> J[最终视频]
+```
+
+**关键优化**：
+- ✅ **字幕同步保护**：严格验证LLM纠错词数，防止时间轴错位
+- ✅ **高效加速策略**：在最终视频应用速度，避免单句重复编码
+- ✅ **智能BGM处理**：自动循环短BGM，截断长BGM
+- ✅ **增量缓存**：已生成的图片和音频智能复用
+
+### 🔐 API密钥管理
+
+- ✅ 多供应商支持（OpenAI、Anthropic、硅基流动、自定义）
+- ✅ 多密钥配置与切换
+- ✅ 密钥状态监控
+- ✅ 用量统计（即将推出）
+
+### 📦 BGM资源管理
+
+- ✅ BGM上传与管理
+- ✅ 音频时长自动识别
+- ✅ 预签名URL访问
+- ✅ 批量删除
+
+---
+
+## 🚀 快速开始
+
+### 📋 前置要求
+
+| 工具 | 版本要求 | 说明 |
+|------|---------|------|
+| **Node.js** | >= 18.0.0 | 前端运行环境 |
+| **Python** | >= 3.11 | 后端运行环境 |
+| **uv** | 最新版 | Python包管理器 |
+| **FFmpeg** | 最新版 | 视频处理核心 |
+| **Docker** | 最新版 | 基础设施服务 |
+
+### 🔑 API平台注册
+
+本项目依赖第三方AI模型，需要注册以下平台：
+
+1. **[推荐] 硅基流动** (TTS/大模型)
+   - 注册链接：[https://cloud.siliconflow.cn/i/63zI7Mdc](https://cloud.siliconflow.cn/i/63zI7Mdc)
+   - 用途：高质量中文TTS、大模型服务
+
+2. **[低成本] 第三方中转平台** (Sora_Image)
+   - 注册链接：[https://api.vectorengine.ai/register?aff=YVx7](https://api.vectorengine.ai/register?aff=YVx7)
+   - 用途：低成本图片生成（约0.04元/张）
+   - ⚠️ **注意**：按需充值，用多少充多少
+
+### 📦 安装步骤
+
+#### 1. 安装系统依赖
+
+**FFmpeg (视频处理核心)**
+
+```bash
+# Windows (Chocolatey)
+choco install ffmpeg
+
+# Windows (Scoop)
+scoop install ffmpeg
+
+# macOS
+brew install ffmpeg
+
+# Ubuntu/Debian
+sudo apt update && sudo apt install ffmpeg
+
+# CentOS/RHEL
+sudo yum install epel-release && sudo yum install ffmpeg
+```
+
+**uv (Python包管理器)**
+
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 或使用pip
+pip install uv
+```
+
+#### 2. 配置环境变量
 
 ```bash
 # 复制环境变量模板
 cp .env.example .env
 
-# 编辑 .env 文件，填入你的 API KEY、数据库连接等配置信息
-# 验证FFmpeg安装
-ffmpeg -version
+# 编辑.env文件，填入配置
+# - API密钥
+# - 数据库连接
+# - MinIO配置
+# 等
 ```
 
-### 4\. 完整启动流程
+#### 3. 启动服务
 
-#### 方式一：一键启动（推荐）
+**方式一：一键启动（推荐）**
 
 ```bash
-# 1. 启动所有基础设施服务 (PostgreSQL, Redis, MinIO)
+# 1. 启动基础设施 (PostgreSQL, Redis, MinIO)
 ./scripts/start.sh
 
-# 2. 等待服务启动后，在新终端中启动后端服务
+# 2. 启动后端API服务（新终端）
 cd backend
-uv sync                     # 安装Python依赖
-alembic upgrade head        # 运行数据库迁移
-uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000  # 启动API服务
+uv sync
+alembic upgrade head
+uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
-# 3. 在另一个终端中启动 Celery Worker (异步任务处理器)
+# 3. 启动Celery Worker（新终端）
 cd backend
 uv run celery -A src.tasks.celery_app worker --loglevel=info
 
-# 4. 在另一个终端中启动前端服务
+# 4. 启动前端服务（新终端）
 cd frontend
-npm install                 # 安装Node.js依赖
-npm run dev                 # 启动开发服务器
+npm install
+npm run dev
 ```
 
-#### 方式二：分步启动
+**方式二：Docker Compose**
 
-1.  **启动基础设施 (PostgreSQL, Redis, MinIO)**
-    ```bash
-    docker-compose up -d
-    # 检查状态：docker-compose ps
-    ```
-2.  **启动后端 API 服务**
-    ```bash
-    cd backend
-    uv sync
-    alembic upgrade head
-    uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
-    ```
-3.  **启动 Celery Worker**
-    ```bash
-    cd backend
-    uv run celery -A src.tasks.celery_app worker --loglevel=info
-    ```
-4.  **启动前端服务**
-    ```bash
-    cd frontend
-    npm install
-    npm run dev
-    ```
+```bash
+# 启动所有服务
+docker-compose up -d
 
-### 5\. 验证启动成功
+# 查看服务状态
+docker-compose ps
 
-访问以下地址验证服务正常运行：
+# 查看日志
+docker-compose logs -f
+```
 
-  * **前端应用:** `http://localhost:3000` (或 `http://localhost:3001`)
-  * **API 文档:** `http://localhost:8000/docs`
-  * **MinIO 控制台:** `http://localhost:9001` (用户名: minioadmin, 密码: minioadmin123)
+#### 4. 验证安装
 
------
+访问以下地址确认服务正常：
 
-## 📁 项目结构
+- 🌐 **前端应用**: http://localhost:3000
+- 📚 **API文档**: http://localhost:8000/docs
+- 📦 **MinIO控制台**: http://localhost:9001 (minioadmin/minioadmin123)
+
+---
+
+## 🏗️ 技术架构
+
+### 后端技术栈
+
+```
+FastAPI + SQLAlchemy + Celery + PostgreSQL + Redis + MinIO
+```
+
+- **FastAPI**: 高性能异步Web框架
+- **SQLAlchemy**: ORM与数据库管理
+- **Celery**: 分布式异步任务队列
+- **PostgreSQL**: 主数据库
+- **Redis**: 缓存与消息队列
+- **MinIO**: 对象存储（图片、音频、视频）
+
+### 前端技术栈
+
+```
+Vue 3 + Element Plus + Pinia + Vite
+```
+
+- **Vue 3**: 渐进式JavaScript框架
+- **Element Plus**: 企业级UI组件库
+- **Pinia**: 状态管理
+- **Vite**: 下一代前端构建工具
+
+### 项目结构
 
 ```
 aicon2/
-├── README.md              # 项目总览
-├── backend/               # Python/FastAPI 后端核心业务
-├── frontend/              # Vue.js/Element Plus 现代化管理界面
-├── scripts/               # 运维脚本
-├── docker-compose.yml     # 基础设施编排 (Postgres, Redis, MinIO)
+├── backend/                 # Python/FastAPI后端
+│   ├── src/
+│   │   ├── api/            # API路由
+│   │   ├── models/         # 数据模型
+│   │   ├── services/       # 业务逻辑
+│   │   ├── tasks/          # Celery任务
+│   │   └── utils/          # 工具函数
+│   ├── alembic/            # 数据库迁移
+│   └── tests/              # 测试
+├── frontend/               # Vue.js前端
+│   ├── src/
+│   │   ├── components/     # Vue组件
+│   │   ├── composables/    # 组合式API
+│   │   ├── services/       # API服务
+│   │   ├── stores/         # Pinia状态
+│   │   └── views/          # 页面视图
+│   └── public/             # 静态资源
+├── scripts/                # 运维脚本
+├── docker-compose.yml      # Docker编排
 └── .env.example           # 环境变量模板
 ```
 
------
+---
+
+## 📖 文档
+
+### 使用指南
+
+1. **项目管理**
+   - 上传文本文件（TXT/DOCX/PDF/EPUB）
+   - 自动章节识别与解析
+   - 编辑章节内容
+
+2. **素材生成**
+   - 配置API密钥
+   - 批量生成提示词
+   - 批量生成图片和音频
+   - 预览与调整
+
+3. **视频合成**
+   - 配置视频参数（分辨率、帧率、字幕样式）
+   - 选择BGM（可选）
+   - 设置视频速度
+   - 启用LLM字幕纠错（可选）
+   - 一键生成视频
+
+### API文档
+
+启动服务后访问：http://localhost:8000/docs
+
+---
 
 ## 🔧 常用命令
 
 | 命令 | 描述 |
-| :--- | :--- |
-| `docker-compose up -d` | 启动所有基础设施（Postgres, Redis, MinIO）。 |
-| `docker-compose down` | 停止并移除所有基础设施容器。 |
-| `docker-compose logs -f` | 实时查看基础设施日志。 |
-| `cd backend && uv sync` | 安装或同步 Python 后端依赖。 |
-| `cd backend && alembic upgrade head` | 执行数据库迁移。 |
+|------|------|
+| `docker-compose up -d` | 启动基础设施 |
+| `docker-compose down` | 停止基础设施 |
+| `docker-compose logs -f` | 查看日志 |
+| `cd backend && uv sync` | 安装Python依赖 |
+| `cd backend && alembic upgrade head` | 数据库迁移 |
+| `cd frontend && npm install` | 安装Node依赖 |
+| `cd frontend && npm run dev` | 启动前端开发服务器 |
+
+---
+
+## 🎯 成本优化建议
+
+### 推荐配置（极致性价比）
+
+| 步骤 | 推荐服务 | 成本 |
+|------|---------|------|
+| **提示词生成** | GPT-4o-mini / DeepSeek | ~¥0.001/句 |
+| **图片生成** | Sora_Image（中转平台） | ~¥0.04/张 |
+| **语音合成** | 硅基流动 index-tts2 | ~¥0.02/句 |
+
+**示例成本计算**（100句视频）：
+- 提示词：100 × ¥0.001 = ¥0.1
+- 图片：100 × ¥0.04 = ¥4
+- 语音：100 × ¥0.02 = ¥2
+- **总计：约¥6.1**
+
+---
+
+## 🔮 未来规划
+
+- [ ] **角色一致性**：保持视频中人物形象稳定
+- [ ] **动态漫画**：从静态图片升级到动态画面
+- [ ] **智能运镜**：电影级镜头语言
+- [ ] **可视化编排**：所见即所得的导演模式
+- [ ] **多平台分发**：一键发布到B站、YouTube等
+
+---
+
+## 📄 License
+
+MIT License - 详见 [LICENSE](LICENSE) 文件
+
+---
+
+## 🙏 致谢
+
+感谢以下开源项目和服务：
+
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [Vue.js](https://vuejs.org/)
+- [Element Plus](https://element-plus.org/)
+- [FFmpeg](https://ffmpeg.org/)
+- [Celery](https://docs.celeryq.dev/)
+- [硅基流动](https://cloud.siliconflow.cn/)
+
+---
+
+<div align="center">
+
+**⭐ 如果这个项目对你有帮助，请给个Star！**
+
+Made with ❤️ by AICG Team
+
+</div>
