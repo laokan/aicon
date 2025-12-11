@@ -299,11 +299,58 @@ docker-compose logs -f
 
 #### 4. 验证安装
 
-访问以下地址确认服务正常：
+访问以下地址确认服务正常:
 
 - 🌐 **前端应用**: http://localhost:3000
 - 📚 **API文档**: http://localhost:8000/docs
 - 📦 **MinIO控制台**: http://localhost:9001 (minioadmin/minioadmin123)
+
+#### 5. GPU加速配置 (可选)
+
+如果您有NVIDIA GPU并希望加速视频字幕生成(faster-whisper),可以启用GPU支持:
+
+**适用环境**: Linux / WSL
+
+**前置条件**:
+- NVIDIA GPU (支持CUDA)
+- 已安装CUDA驱动
+- 当前项目安装命令 `uv pip install .[gpu] -i https://pypi.tuna.tsinghua.edu.cn/simple`
+
+**配置步骤**:
+
+1. **设置CUDA动态库路径**
+
+   激活虚拟环境后,设置环境变量:
+   ```bash
+   source .venv/bin/activate
+   export LD_LIBRARY_PATH="<PROJECT_PATH>/.venv/lib/python3.12/site-packages/nvidia/cublas/lib:<PROJECT_PATH>/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH"
+   ```
+   
+   将 `<PROJECT_PATH>` 替换为实际项目路径。
+
+2. **自动加载配置 (推荐)**
+
+   将以下内容追加到 `.venv/bin/activate`,每次激活虚拟环境自动启用GPU:
+   ```bash
+   export LD_LIBRARY_PATH="<PROJECT_PATH>/.venv/lib/python3.12/site-packages/nvidia/cublas/lib:<PROJECT_PATH>/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH"
+   ```
+
+3. **修改Whisper服务配置**
+
+   编辑 `backend/src/services/faster_whisper_service.py`:
+   ```python
+   class WhisperTranscriptionService:
+       def __init__(self, model_size="small", device="cuda", compute_type="float32"):
+           """初始化语音识别服务"""
+           logger.info(f"🔄 正在加载 Whisper 模型: {model_size} ...")
+           self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
+           self.cc = OpenCC("t2s")
+           logger.info(f"✅ 模型加载完成")
+   ```
+   
+   将 `device` 参数从 `"cpu"` 改为 `"cuda"`,`model_size` 可根据显存调整(tiny/base/small/medium/large)。
+
+**性能提升**: GPU加速可将字幕生成速度提升3-10倍,具体取决于GPU型号。
 
 ---
 

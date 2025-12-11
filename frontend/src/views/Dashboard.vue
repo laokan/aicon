@@ -34,7 +34,7 @@
           </div>
           <div class="action-content">
             <h4>项目管理</h4>
-            <p>{{ 0 }} 个项目</p>
+            <p>{{ projectCount }} 个项目</p>
           </div>
           <div class="action-arrow">
             <el-icon size="16"><ArrowRight /></el-icon>
@@ -80,7 +80,7 @@
               <el-icon><Folder /></el-icon>
             </div>
             <div class="mini-stat-info">
-              <div class="mini-stat-number">0</div>
+              <div class="mini-stat-number">{{ projectCount }}</div>
               <div class="mini-stat-label">项目</div>
             </div>
           </div>
@@ -90,7 +90,7 @@
               <el-icon><Timer /></el-icon>
             </div>
             <div class="mini-stat-info">
-              <div class="mini-stat-number">0</div>
+              <div class="mini-stat-number">{{ runningTasks }}</div>
               <div class="mini-stat-label">进行中</div>
             </div>
           </div>
@@ -100,7 +100,7 @@
               <el-icon><Share /></el-icon>
             </div>
             <div class="mini-stat-info">
-              <div class="mini-stat-number">0</div>
+              <div class="mini-stat-number">{{ publishedVideos }}</div>
               <div class="mini-stat-label">已发布</div>
             </div>
           </div>
@@ -110,8 +110,15 @@
               <el-icon><Money /></el-icon>
             </div>
             <div class="mini-stat-info">
-              <div class="mini-stat-number">¥0</div>
-              <div class="mini-stat-label">总成本</div>
+              <el-tooltip
+                content="基于已生成内容的成本估算,非实际扣费金额"
+                placement="top"
+              >
+                <div class="mini-stat-number cost-estimate">
+                  ≈¥{{ totalCost.toFixed(2) }}
+                </div>
+              </el-tooltip>
+              <div class="mini-stat-label">成本估算</div>
             </div>
           </div>
         </div>
@@ -123,12 +130,34 @@
             <el-button link @click="$router.push('/projects')">查看全部</el-button>
           </div>
           <div class="projects-list">
-            <div class="empty-projects">
+            <div v-if="loading" class="loading-skeleton">
+              <el-skeleton :rows="3" animated />
+            </div>
+            <div v-else-if="recentProjects.length === 0" class="empty-projects">
               <el-icon size="32"><Document /></el-icon>
               <p>暂无项目</p>
               <el-button type="primary" plain @click="$router.push('/projects')">
                 创建第一个项目
               </el-button>
+            </div>
+            <div v-else class="project-items">
+              <div
+                v-for="project in recentProjects"
+                :key="project.id"
+                class="project-item"
+                @click="$router.push(`/projects/${project.id}`)"
+              >
+                <div class="project-info">
+                  <h4>{{ project.title }}</h4>
+                  <p>{{ project.chapter_count }} 章节 · {{ project.word_count }} 字</p>
+                </div>
+                <div class="project-meta">
+                  <el-tag :type="getStatusType(project.status)" size="small">
+                    {{ getStatusText(project.status) }}
+                  </el-tag>
+                  <span class="project-time">{{ formatTime(project.updated_at) }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -146,12 +175,33 @@
             <el-button link @click="$router.push('/generation')">管理</el-button>
           </div>
           <div class="queue-content">
-            <div class="empty-queue">
+            <div v-if="loading" class="loading-skeleton">
+              <el-skeleton :rows="2" animated />
+            </div>
+            <div v-else-if="!taskQueue || taskQueue.running_tasks === 0" class="empty-queue">
               <el-icon size="32"><VideoCamera /></el-icon>
               <p>队列为空</p>
               <el-button type="primary" plain @click="$router.push('/generation')">
                 开始生成视频
               </el-button>
+            </div>
+            <div v-else class="task-items">
+              <div
+                v-for="task in taskQueue.tasks"
+                :key="task.id"
+                class="task-item"
+              >
+                <div class="task-info">
+                  <el-icon><Timer /></el-icon>
+                  <span>{{ task.title }}</span>
+                </div>
+                <div class="task-progress">
+                  <el-progress
+                    :percentage="task.progress"
+                    :status="task.progress === 100 ? 'success' : undefined"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -165,9 +215,27 @@
             </h3>
           </div>
           <div class="activity-list">
-            <div class="empty-activity">
+            <div v-if="loading" class="loading-skeleton">
+              <el-skeleton :rows="3" animated />
+            </div>
+            <div v-else-if="recentActivities.length === 0" class="empty-activity">
               <el-icon size="32"><Document /></el-icon>
               <p>暂无活动记录</p>
+            </div>
+            <div v-else class="activity-items">
+              <div
+                v-for="activity in recentActivities"
+                :key="activity.id"
+                class="activity-item"
+              >
+                <div class="activity-icon">
+                  <el-icon :component="getActivityIcon(activity.type)" />
+                </div>
+                <div class="activity-content">
+                  <p class="activity-desc">{{ activity.description }}</p>
+                  <span class="activity-time">{{ formatTime(activity.timestamp) }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -177,8 +245,10 @@
 </template>
 
 <script setup>
+import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import {
   Folder,
   VideoPlay,
@@ -190,21 +260,129 @@ import {
   ArrowRight,
   Clock,
   VideoCamera,
-  Money
+  Money,
+  Refresh
 } from '@element-plus/icons-vue'
+import { dashboardService } from '@/services/dashboard'
 
 const authStore = useAuthStore()
 const router = useRouter()
 
-// 为MainLayout提供actions slot内容 - 通过provide提供
-import { provide } from 'vue'
+// 数据状态
+const loading = ref(false)
+const statistics = ref(null)
+const recentProjects = ref([])
+const recentActivities = ref([])
+const taskQueue = ref(null)
+
+// 计算属性 - 从统计数据中提取值
+const projectCount = computed(() => statistics.value?.projects?.total || 0)
+const runningTasks = computed(() => statistics.value?.tasks?.running_tasks || 0)
+const publishedVideos = computed(() => statistics.value?.generation?.generated_videos || 0)
+const totalCost = computed(() => statistics.value?.cost?.total || 0)
+
+// 加载仪表盘数据
+const loadDashboardData = async () => {
+  loading.value = true
+  try {
+    // 并行加载所有数据
+    const [stats, projects, activities, queue] = await Promise.all([
+      dashboardService.getStatistics(),
+      dashboardService.getRecentProjects(5),
+      dashboardService.getRecentActivities(10),
+      dashboardService.getTaskQueue()
+    ])
+
+    statistics.value = stats
+    recentProjects.value = projects.projects || []
+    recentActivities.value = activities.activities || []
+    taskQueue.value = queue
+  } catch (error) {
+    console.error('加载仪表盘数据失败:', error)
+    ElMessage.error('加载仪表盘数据失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 刷新数据
+const refreshData = async () => {
+  await loadDashboardData()
+  ElMessage.success('数据已刷新')
+}
+
+// 格式化时间
+const formatTime = (timestamp) => {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diff = now - date
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes}分钟前`
+  if (hours < 24) return `${hours}小时前`
+  if (days < 7) return `${days}天前`
+  return date.toLocaleDateString('zh-CN')
+}
+
+// 获取活动类型图标
+const getActivityIcon = (type) => {
+  switch (type) {
+    case 'project_created':
+      return Folder
+    case 'chapter_confirmed':
+      return Document
+    case 'video_generated':
+      return VideoCamera
+    default:
+      return Document
+  }
+}
+
+// 获取状态标签类型
+const getStatusType = (status) => {
+  const statusMap = {
+    uploaded: 'info',
+    parsing: 'warning',
+    parsed: 'success',
+    generating: 'warning',
+    completed: 'success',
+    failed: 'danger',
+    archived: 'info'
+  }
+  return statusMap[status] || 'info'
+}
+
+// 获取状态文本
+const getStatusText = (status) => {
+  const statusTextMap = {
+    uploaded: '已上传',
+    parsing: '解析中',
+    parsed: '已解析',
+    generating: '生成中',
+    completed: '已完成',
+    failed: '失败',
+    archived: '已归档'
+  }
+  return statusTextMap[status] || status
+}
 
 defineOptions({
   name: 'Dashboard'
 })
 
 // 向MainLayout提供header actions
+import { provide } from 'vue'
 provide('headerActions', [
+  {
+    text: '刷新',
+    type: 'default',
+    icon: Refresh,
+    action: refreshData
+  },
   {
     text: '项目管理',
     type: 'default',
@@ -218,6 +396,11 @@ provide('headerActions', [
     action: () => router.push('/generation')
   }
 ])
+
+// 组件挂载时加载数据
+onMounted(() => {
+  loadDashboardData()
+})
 </script>
 
 <style scoped>
@@ -501,6 +684,10 @@ provide('headerActions', [
   line-height: 1;
 }
 
+.mini-stat-number.cost-estimate {
+  cursor: help;
+}
+
 .mini-stat-label {
   font-size: var(--text-sm);
   color: var(--text-secondary);
@@ -557,6 +744,138 @@ provide('headerActions', [
 .empty-activity p {
   margin: 0 0 var(--space-md) 0;
   font-size: var(--text-base);
+}
+
+/* 加载骨架屏 */
+.loading-skeleton {
+  padding: var(--space-lg);
+}
+
+/* 项目列表项 */
+.project-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.project-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md);
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.project-item:hover {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-sm);
+  transform: translateX(4px);
+}
+
+.project-info h4 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-xs) 0;
+}
+
+.project-info p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.project-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-xs);
+}
+
+.project-time {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* 任务列表项 */
+.task-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.task-item {
+  padding: var(--space-md);
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+}
+
+.task-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.task-progress {
+  width: 100%;
+}
+
+/* 活动列表项 */
+.activity-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+  transition: all var(--transition-base);
+}
+
+.activity-item:hover {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.activity-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-light);
+  color: var(--primary-color);
+  flex-shrink: 0;
+}
+
+.activity-content {
+  flex: 1;
+}
+
+.activity-desc {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-xs) 0;
+}
+
+.activity-time {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
 }
 
 /* 响应式设计 */
