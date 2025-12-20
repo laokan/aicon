@@ -3,8 +3,9 @@
 """
 
 from typing import List, Optional
-from pydantic import BaseModel, UUID4
-from datetime import datetime
+from pydantic import BaseModel, UUID4, Field, field_validator
+from datetime import datetime, timedelta
+from src.utils.storage import storage_client
 
 # --- 剧本相关 ---
 class ScriptGenerateRequest(BaseModel):
@@ -19,6 +20,16 @@ class MovieShotBase(BaseModel):
     performance_prompt: Optional[str] = None
     first_frame_url: Optional[str] = None
     video_url: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+    
+    @field_validator("first_frame_url", "video_url", mode="after")
+    @classmethod
+    def sign_urls(cls, v: Optional[str]) -> Optional[str]:
+        if v and not v.startswith("http"):
+            return storage_client.get_presigned_url(v, timedelta(hours=24))
+        return v
 
 class MovieSceneBase(BaseModel):
     order_index: int
@@ -27,6 +38,9 @@ class MovieSceneBase(BaseModel):
     atmosphere: Optional[str] = None
     description: Optional[str] = None
     shots: List[MovieShotBase]
+    
+    class Config:
+        from_attributes = True
 
 class MovieScriptResponse(BaseModel):
     id: UUID4
@@ -48,6 +62,24 @@ class MovieCharacterBase(BaseModel):
     class Config:
         from_attributes = True
 
+    @field_validator("avatar_url", mode="after")
+    @classmethod
+    def sign_avatar_url(cls, v: Optional[str]) -> Optional[str]:
+        if v and not v.startswith("http"):
+            return storage_client.get_presigned_url(v, timedelta(hours=24))
+        return v
+
+    @field_validator("reference_images", mode="after")
+    @classmethod
+    def sign_reference_images(cls, v: List[str]) -> List[str]:
+        if not v:
+            return v
+        return [
+            storage_client.get_presigned_url(img, timedelta(hours=24))
+            if img and not img.startswith("http") else img
+            for img in v
+        ]
+
 class CharacterExtractRequest(BaseModel):
     api_key_id: str
     model: Optional[str] = None
@@ -55,6 +87,16 @@ class CharacterExtractRequest(BaseModel):
 class CharacterUpdateRequest(BaseModel):
     avatar_url: Optional[str] = None
     reference_images: Optional[List[str]] = None
+
+class CharacterGenerateRequest(BaseModel):
+    api_key_id: str
+    model: Optional[str] = None # e.g. "flux-pro"
+    style: Optional[str] = "cinematic"
+    prompt: Optional[str] = None
+
+class KeyframeGenerateRequest(BaseModel):
+    api_key_id: str
+    model: Optional[str] = None
 
 # --- 生产相关 ---
 class ShotProduceRequest(BaseModel):

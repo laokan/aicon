@@ -11,6 +11,8 @@ from src.services.provider.factory import ProviderFactory
 from src.services.api_key import APIKeyService
 from src.services.visual_identity_service import visual_identity_service
 from src.services.dialogue_prompt_engine import dialogue_prompt_engine
+from src.utils.storage import storage_client
+from datetime import timedelta
 
 logger = get_logger(__name__)
 
@@ -35,7 +37,7 @@ class MovieProductionService(SessionManagedService):
             
             # 1. 确保有首帧
             if not shot.first_frame_url:
-                await visual_identity_service.generate_shot_first_frame(shot_id, api_key_id)
+                await visual_identity_service.generate_shot_first_frame(shot_id, api_key_id, model=model)
                 await self.db_session.refresh(shot)
 
             # 2. 确保有对话表现
@@ -49,6 +51,22 @@ class MovieProductionService(SessionManagedService):
             stmt = select(Chapter).join(MovieScript).join(MovieScene).where(MovieScene.id == shot.scene_id)
             chapter = (await self.db_session.execute(stmt)).scalars().first()
             
+            # 3. 收集角色一致性参考图
+            project_id = chapter.project_id
+            stmt_chars = select(MovieCharacter).where(MovieCharacter.project_id == project_id)
+            all_chars = (await self.db_session.execute(stmt_chars)).scalars().all()
+            
+            ref_images = []
+            for char in all_chars:
+                if char.name in shot.visual_description:
+                    if char.avatar_url:
+                        ref_images.append(char.avatar_url)
+                    if char.reference_images:
+                        ref_images.extend(char.reference_images)
+            
+            # 去重并限制数量
+            ref_images = list(dict.fromkeys(ref_images))[:3]
+
             api_key_service = APIKeyService(self.db_session)
             api_key = await api_key_service.get_api_key_by_id(api_key_id, str(chapter.project.owner_id))
 
@@ -63,11 +81,25 @@ class MovieProductionService(SessionManagedService):
             # 综合 Prompt
             final_prompt = f"{shot.visual_description}. {shot.camera_movement or ''}. {shot.performance_prompt or ''}"
             
+            # 合并图片并对 MinIO 对象键进行预签名
+            all_raw_images = [shot.first_frame_url] if shot.first_frame_url else []
+            all_raw_images.extend(ref_images)
+            
+            # 如果是存储对象键，则生成 24 小时有效的预签名 URL
+            all_signed_images = []
+            for img in all_raw_images:
+                if img and not img.startswith("http"):
+                    all_signed_images.append(storage_client.get_presigned_url(img, timedelta(hours=24)))
+                else:
+                    all_signed_images.append(img)
+
             try:
                 task_resp = await vector_provider.create_video( # type: ignore
                     prompt=final_prompt,
-                    images=[shot.first_frame_url],
-                    model=model
+                    images=all_signed_images,
+                    model=model,
+                    # 可以透传更多 Veo 3.1 专用参数
+                    use_character_ref=True if ref_images else False
                 )
                 
                 shot.video_task_id = task_resp.get("id")

@@ -3,7 +3,7 @@
 """
 
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -12,6 +12,12 @@ from src.models.movie import MovieCharacter, MovieScript, MovieScene, MovieShot
 from src.services.base import SessionManagedService
 from src.services.provider.factory import ProviderFactory
 from src.services.api_key import APIKeyService
+from src.services.image import retry_with_backoff
+from src.utils.storage import get_storage_client
+import uuid
+import io
+import aiohttp
+from fastapi import UploadFile
 
 logger = get_logger(__name__)
 
@@ -121,6 +127,84 @@ class MovieCharacterService(SessionManagedService):
                 
             except Exception as e:
                 logger.error(f"提取角色失败: {e}")
+                raise
+    
+    STYLE_MAP = {
+        "cinematic": "Cinematic lighting, movie still, 8k, photorealistic, dramatic, highly detailed face",
+        "anime": "Anime style, vibrant colors, detailed line art, digital illustration, clean lines",
+        "cyberpunk": "Cyberpunk style, neon lights, high tech low life, futuristic atmosphere, blue and pink lighting",
+        "oil_painting": "Oil painting style, brush strokes, classical art, rich colors, textured canvas"
+    }
+
+    async def generate_character_avatar(self, character_id: str, api_key_id: str, model: str = None, prompt: str = None, style: str = "cinematic") -> str:
+        """
+        生成角色头像/定妆照
+        """
+        async with self:
+            char = await self.db_session.get(MovieCharacter, character_id)
+            if not char:
+                raise ValueError("未找到角色")
+            
+            # 加载 API Key
+            from src.models.project import Project
+            project = await self.db_session.get(Project, char.project_id)
+            api_key_service = APIKeyService(self.db_session)
+            api_key = await api_key_service.get_api_key_by_id(api_key_id, str(project.owner_id))
+
+            image_provider = ProviderFactory.create(
+                provider=api_key.provider,
+                api_key=api_key.get_api_key(),
+                base_url=api_key.base_url
+            )
+            
+            try:
+                # 4. 调用生图模型
+                logger.info(f"生成角色头像提示词: {prompt}")
+                result = await retry_with_backoff(
+                    lambda: image_provider.generate_image(
+                        prompt=prompt,
+                        model=model
+                    )
+                )
+                
+                image_data = result.data[0]
+                image_url = image_data.url
+                
+                # 5. 下载图片并上传 MinIO
+                async with aiohttp.ClientSession() as http_session:
+                    async with http_session.get(image_url) as resp:
+                        if resp.status != 200:
+                            raise Exception(f"下载图片失败: {resp.status}")
+                        content = await resp.read()
+
+                storage_client = await get_storage_client()
+                file_id = str(uuid.uuid4())
+                upload_file = UploadFile(
+                    filename=f"{file_id}.jpg",
+                    file=io.BytesIO(content),
+                )
+                
+                storage_result = await storage_client.upload_file(
+                    user_id=str(project.owner_id),
+                    file=upload_file,
+                    metadata={"character_id": str(char.id)}
+                )
+                object_key = storage_result["object_key"]
+
+                # 6. 更新角色信息
+                char.avatar_url = object_key
+                
+                # 更新参考图列表
+                refs = list(char.reference_images) if char.reference_images else []
+                if object_key not in refs:
+                    refs.insert(0, object_key)
+                    char.reference_images = refs
+                
+                await self.db_session.commit()
+                return object_key
+                
+            except Exception as e:
+                logger.error(f"生成角色头像失败: {e}")
                 raise
 
 movie_character_service = MovieCharacterService()

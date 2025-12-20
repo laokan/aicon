@@ -337,6 +337,32 @@ def movie_extract_characters(self, script_id: str, api_key_id: str, model: str =
     logger.info(f"Celery任务完成: movie_extract_characters, extracted {len(chars)} characters")
     return {"character_count": len(chars)}
 
+@celery_app.task(
+    bind=True,
+    max_retries=1,
+    autoretry_for=(Exception,),
+    name="movie.generate_character_avatar"
+)
+def movie_generate_character_avatar(self, character_id: str, api_key_id: str, model: str = None, prompt: str = None, style: str = "cinematic"):
+    from src.services.movie_character_service import movie_character_service
+    logger.info(f"Celery任务开始: movie_generate_character_avatar (character_id={character_id})")
+    url = run_async_task(movie_character_service.generate_character_avatar(character_id, api_key_id, model, prompt, style))
+    logger.info(f"Celery任务完成: movie_generate_character_avatar")
+    return {"avatar_url": url}
+
+@celery_app.task(
+    bind=True,
+    max_retries=1,
+    autoretry_for=(Exception,),
+    name="movie.generate_keyframes"
+)
+def movie_generate_keyframes(self, script_id: str, api_key_id: str, model: str = None):
+    from src.services.visual_identity_service import visual_identity_service
+    logger.info(f"Celery任务开始: movie_generate_keyframes (script_id={script_id})")
+    stats = run_async_task(visual_identity_service.batch_generate_keyframes(script_id, api_key_id, model))
+    logger.info(f"Celery任务完成: movie_generate_keyframes")
+    return stats
+
 
 # ---------------------------
 # 导出的任务列表
@@ -354,4 +380,6 @@ __all__ = [
     'movie_generate_script',
     'movie_produce_shot',
     'movie_extract_characters',
+    'movie_generate_character_avatar',
+    'movie_generate_keyframes',
 ]
