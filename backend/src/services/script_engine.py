@@ -4,7 +4,7 @@
 
 import json
 import asyncio
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
