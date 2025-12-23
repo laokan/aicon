@@ -72,7 +72,7 @@
         <!-- 右侧剧组栏 -->
         <transition name="slide-fade">
           <CastManager
-            v-if="characters.length > 0 && showCastManager"
+            v-if="showCastManager"
             :characters="characters"
             :extracting="extractingCharacters"
             @detect="detectCharacters"

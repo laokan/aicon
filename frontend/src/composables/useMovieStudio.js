@@ -55,7 +55,7 @@ export function useMovieStudio() {
     // 计算属性
     const canPrepareMaterials = computed(() => completionStatus.value?.can_transition)
     const allCharactersReady = computed(() => {
-        if (characters.value.length === 0) return false
+        if (characters.value.length === 0) return true
         return characters.value.every(c => !!c.avatar_url)
     })
 
@@ -444,6 +444,12 @@ export function useMovieStudio() {
     }
 
     // 生命周期与 Watchers
+    watch(showGenerateDialog, (val) => {
+        if (val && genConfig.value.api_key_id) {
+            fetchModels()
+        }
+    })
+
     watch(selectedChapterId, (newId) => {
         if (newId) {
             if (route.params.chapterId !== newId) {
