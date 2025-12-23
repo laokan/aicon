@@ -253,8 +253,13 @@ export function useMovieStudio() {
     const handleGenerateAvatar = (char) => {
         selectedCharacter.value = char
         dialogMode.value = 'avatar'
-        const stylePrompt = STYLE_PROMPTS[genConfig.value.style] || STYLE_PROMPTS.cinematic
-        genConfig.value.prompt = `${stylePrompt}, ${char.visual_traits}`
+        // 优先使用generated_prompt(三视图提示词),如果不存在则使用旧逻辑
+        if (char.generated_prompt) {
+            genConfig.value.prompt = char.generated_prompt
+        } else {
+            const stylePrompt = STYLE_PROMPTS[genConfig.value.style] || STYLE_PROMPTS.cinematic
+            genConfig.value.prompt = `${stylePrompt}, ${char.visual_traits}`
+        }
         showGenerateDialog.value = true
     }
 
@@ -494,8 +499,11 @@ export function useMovieStudio() {
 
     watch(() => genConfig.value.style, (newStyle) => {
         if (dialogMode.value === 'avatar' && selectedCharacter.value) {
-            const stylePrompt = STYLE_PROMPTS[newStyle] || STYLE_PROMPTS.cinematic
-            genConfig.value.prompt = `${stylePrompt}, ${selectedCharacter.value.visual_traits}`
+            // 如果有generated_prompt,则不随style变化而改变(三视图提示词已包含完整信息)
+            if (!selectedCharacter.value.generated_prompt) {
+                const stylePrompt = STYLE_PROMPTS[newStyle] || STYLE_PROMPTS.cinematic
+                genConfig.value.prompt = `${stylePrompt}, ${selectedCharacter.value.visual_traits}`
+            }
         }
     })
 

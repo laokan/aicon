@@ -3,7 +3,8 @@
 """
 
 import json
-from typing import List, Dict, Any, Optional
+import re
+from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -21,28 +22,129 @@ from fastapi import UploadFile
 
 logger = get_logger(__name__)
 
+class CharacterThreeViewPromptBuilder:
+    """
+    角色三视图提示词生成器
+    根据 Gemini 3 Pro Image 最佳实践生成提示词
+    核心结构: [时代背景] + [角色身份] + [三视图要求] + [一致性关键词] + [风格/技术参数]
+    """
+    
+    TEMPLATE = """CINEMATIC CHARACTER TURNAROUND SHEET featuring THREE EXACT VIEWS of {name}:
+front view, 90-degree side view, and back view.
+
+Character details:
+- Name: {name}
+- Era / Time Period: {era_background}
+- Occupation / Social Status: {occupation}
+- Key Visual Traits: {key_visual_traits}
+
+Photorealism & Consistency Requirements:
+- IDENTICAL facial structure, skin details, and expressions across all views
+- IDENTICAL clothing, materials, textures, and wear patterns
+- IDENTICAL hairstyle, length, color, and strand placement
+- IDENTICAL height, body proportions, and posture
+- Consistent lighting direction, intensity, and color temperature
+- Neutral production pose suitable for film reference
+
+Cinematic Rendering Specs:
+- Photorealistic, live-action film quality
+- Physically Based Rendering (PBR) materials
+- Realistic skin shaders with subsurface scattering
+- High dynamic range studio lighting (HDRI)
+- Subtle film grain, realistic contrast and depth
+- Neutral or black studio background
+
+Technical Output:
+- Ultra-high detail cinematic character reference
+- Unreal Engine 5 / cinematic renderer quality
+- 8K-level detail
+- Aspect ratio: 16:9
+"""
+    
+    @classmethod
+    def build_prompt(
+        cls,
+        name: str,
+        era_background: Optional[str] = None,
+        occupation: Optional[str] = None,
+        key_visual_traits: Optional[List[str]] = None,
+        visual_traits: Optional[str] = None,
+        role_description: Optional[str] = None
+    ) -> str:
+        """
+        构建三视图提示词
+        
+        Args:
+            name: 角色名称
+            era_background: 时代背景 (如: "1940s WWII", "Victorian Era", "Cyberpunk 2077")
+            occupation: 职业/社会地位
+            key_visual_traits: 核心视觉特征列表 (3-4个)
+            visual_traits: 详细视觉特征描述 (备用)
+            role_description: 角色描述 (备用)
+        
+        Returns:
+            生成的三视图提示词
+        """
+        # 使用默认值或从其他字段推断
+        era = era_background or "Modern era"
+        occ = occupation or "Unknown occupation"
+        
+        # 处理核心视觉特征
+        if key_visual_traits and len(key_visual_traits) > 0:
+            traits_str = ", ".join(key_visual_traits)
+        elif visual_traits:
+            # 如果没有key_visual_traits,从visual_traits中提取前100个字符作为简要描述
+            traits_str = visual_traits[:100] + "..." if len(visual_traits) > 100 else visual_traits
+        else:
+            traits_str = "Standard appearance"
+        
+        # 生成提示词
+        prompt = cls.TEMPLATE.format(
+            name=name,
+            era_background=era,
+            occupation=occ,
+            key_visual_traits=traits_str
+        )
+        
+        return prompt
+
 class MovieCharacterService(BaseService):
     """
     角色管理服务
     """
 
     EXTRACT_CHARACTERS_PROMPT = """
-你是一个资深的选角导演。请分析以下电影剧本片段，提取出其中出现的所有主要角色。
+你是一个资深的选角导演。请分析以下电影剧本片段,提取出其中出现的所有主要角色。
 
-### 输出要求：
-必须以 JSON 格式输出，结构如下：
+### 输出要求:
+必须以 JSON 格式输出,结构如下:
 {{
   "characters": [
     {{
       "name": "角色姓名",
+      "era_background": "时代背景(如: 1940s WWII, Victorian Era, Cyberpunk 2077, Modern era等)",
+      "occupation": "职业或社会地位",
       "role_description": "角色的身份、背景、性格特点",
-      "visual_traits": "详细的视觉特征描述（如：年龄、发色、发型、穿着、面部特征、体型），用于AI生图。",
-      "dialogue_traits": "角色的对话风格（如：冷静、粗鲁、幽默、书生气、口音特点等）"
+      "visual_traits": "详细的视觉特征描述(如:年龄、发色、发型、穿着、面部特征、体型),用于AI生图。",
+      "key_visual_traits": ["核心视觉特征1", "核心视觉特征2", "核心视觉特征3"],
+      "dialogue_traits": "角色的对话风格(如:冷静、粗鲁、幽默、书生气、口音特点等)"
     }}
   ]
 }}
 
-待分析剧本：
+### 重要规则:
+1. **角色名称一致性**: 
+   - 同一角色必须使用完全相同的名称,不要有任何变化
+   - 如果角色有中文名和英文名,统一使用"中文名 (英文名)"格式,例如: "阿尔德里克 (Aldric)"
+   - 不要在同一个输出中出现"阿尔德里克"和"阿尔德里克 (Aldric)"这样的重复
+   - 角色名称应该简洁明确,避免添加额外的描述性文字
+
+2. **字段要求**:
+   - era_background: 根据剧本内容推断时代背景,如果不明确则使用"Modern era"
+   - occupation: 角色的职业或社会地位
+   - key_visual_traits: 提取3-4个最关键的视觉特征,用于生成角色三视图
+
+待分析剧本:
 ---
 {text}
 ---
@@ -96,26 +198,77 @@ class MovieCharacterService(BaseService):
             
             char_data = json.loads(content)
             
+            # 获取项目中已存在的所有角色
+            stmt = select(MovieCharacter).where(MovieCharacter.project_id == chapter.project_id)
+            existing_result = await self.db_session.execute(stmt)
+            existing_characters = {char.name: char for char in existing_result.scalars().all()}
+            
+            def normalize_name(name: str) -> str:
+                """标准化角色名称,提取核心名称用于匹配"""
+                # 移除括号及其内容,只保留主要名称
+                core_name = re.sub(r'\s*\([^)]*\)', '', name).strip()
+                return core_name
+            
+            def find_matching_character(char_name: str, existing_chars: dict) -> Optional[MovieCharacter]:
+                """智能查找匹配的角色"""
+                # 1. 精确匹配
+                if char_name in existing_chars:
+                    return existing_chars[char_name]
+                
+                # 2. 标准化名称匹配
+                normalized_new = normalize_name(char_name)
+                for existing_name, existing_char in existing_chars.items():
+                    normalized_existing = normalize_name(existing_name)
+                    if normalized_new == normalized_existing:
+                        return existing_char
+                
+                return None
+            
             created_characters = []
             for char in char_data.get("characters", []):
-                # 检查是否已存在同名角色
-                stmt = select(MovieCharacter).where(
-                    MovieCharacter.project_id == chapter.project_id,
-                    MovieCharacter.name == char.get("name")
-                )
-                existing = await self.db_session.execute(stmt)
-                if existing.scalar_one_or_none():
+                char_name = char.get("name", "").strip()
+                if not char_name:
                     continue
-                    
-                character = MovieCharacter(
-                    project_id=chapter.project_id,
-                    name=char.get("name"),
-                    role_description=char.get("role_description"),
+                
+                # 智能查找已存在的角色
+                existing_char = find_matching_character(char_name, existing_characters)
+                
+                # 生成三视图提示词
+                generated_prompt = CharacterThreeViewPromptBuilder.build_prompt(
+                    name=char_name,
+                    era_background=char.get("era_background"),
+                    occupation=char.get("occupation"),
+                    key_visual_traits=char.get("key_visual_traits"),
                     visual_traits=char.get("visual_traits"),
-                    dialogue_traits=char.get("dialogue_traits")
+                    role_description=char.get("role_description")
                 )
-                self.db_session.add(character)
-                created_characters.append(character)
+                
+                if existing_char:
+                    # 更新已存在的角色
+                    existing_char.role_description = char.get("role_description")
+                    existing_char.visual_traits = char.get("visual_traits")
+                    existing_char.dialogue_traits = char.get("dialogue_traits")
+                    existing_char.era_background = char.get("era_background")
+                    existing_char.occupation = char.get("occupation")
+                    existing_char.key_visual_traits = char.get("key_visual_traits", [])
+                    existing_char.generated_prompt = generated_prompt
+                    created_characters.append(existing_char)
+                else:
+                    # 创建新角色
+                    character = MovieCharacter(
+                        project_id=chapter.project_id,
+                        name=char_name,
+                        role_description=char.get("role_description"),
+                        visual_traits=char.get("visual_traits"),
+                        dialogue_traits=char.get("dialogue_traits"),
+                        era_background=char.get("era_background"),
+                        occupation=char.get("occupation"),
+                        key_visual_traits=char.get("key_visual_traits", []),
+                        generated_prompt=generated_prompt
+                    )
+                    self.db_session.add(character)
+                    existing_characters[char_name] = character  # 添加到已存在列表,避免本次提取中的重复
+                    created_characters.append(character)
             
             await self.db_session.commit()
             return created_characters
@@ -145,14 +298,15 @@ class MovieCharacterService(BaseService):
         )
         
         try:
-            # 增强提示词，让AI模型在图片左上角生成角色名称
-            enhanced_prompt = f"{prompt}. IMPORTANT: Include the text '{char.name}' in the top-left corner of the image, clearly visible and readable."
+            # 直接使用前端传递的提示词(用户已微调过的三视图提示词)
+            if not prompt:
+                raise ValueError("必须提供生成提示词")
             
-            # 4. 调用生图模型
-            logger.info(f"生成角色头像提示词: {enhanced_prompt}")
+            # 调用生图模型
+            logger.info(f"生成角色头像提示词: {prompt}")
             result = await retry_with_backoff(
                 lambda: image_provider.generate_image(
-                    prompt=enhanced_prompt,
+                    prompt=prompt,
                     model=model
                 )
             )

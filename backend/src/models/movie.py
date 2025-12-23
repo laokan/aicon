@@ -85,12 +85,18 @@ class MovieCharacter(BaseModel):
     project_id = Column(PostgreSQLUUID(as_uuid=True), ForeignKey('projects.id'), nullable=False, index=True, comment="项目外键")
     name = Column(String(100), nullable=False, comment="角色名称")
     role_description = Column(Text, comment="角色描述/背景")
-    visual_traits = Column(Text, comment="视觉特征描述（用于提示词）")
-    dialogue_traits = Column(Text, comment="对话特征描述（语气、口癖等）")
+    visual_traits = Column(Text, comment="视觉特征描述(用于提示词)")
+    dialogue_traits = Column(Text, comment="对话特征描述(语气、口癖等)")
+    
+    # 三视图生成相关字段
+    era_background = Column(String(200), comment="时代背景(如: 1940s WWII, Victorian Era)")
+    occupation = Column(String(200), comment="职业/社会地位")
+    key_visual_traits = Column(JSON, default=list, comment="核心视觉特征列表(3-4个关键特征)")
+    generated_prompt = Column(Text, comment="生成的三视图提示词")
     
     # 资源
     avatar_url = Column(String(500), comment="角色头像URL")
-    reference_images = Column(JSON, default=list, comment="参考图URL列表（人物一致性关键）")
+    reference_images = Column(JSON, default=list, comment="参考图URL列表(人物一致性关键)")
     
     # 关系
     project = relationship("Project")
@@ -109,6 +115,10 @@ class MovieCharacter(BaseModel):
                 role_description=data.get('role_description'),
                 visual_traits=data.get('visual_traits'),
                 dialogue_traits=data.get('dialogue_traits'),
+                era_background=data.get('era_background'),
+                occupation=data.get('occupation'),
+                key_visual_traits=data.get('key_visual_traits', []),
+                generated_prompt=data.get('generated_prompt'),
                 avatar_url=data.get('avatar_url'),
                 reference_images=data.get('reference_images', [])
             )

@@ -66,10 +66,26 @@ class MovieCharacterBase(BaseModel):
     role_description: Optional[str] = None
     visual_traits: Optional[str] = None
     dialogue_traits: Optional[str] = None
+    
+    # 三视图生成相关字段
+    era_background: Optional[str] = None
+    occupation: Optional[str] = None
+    key_visual_traits: List[str] = []
+    generated_prompt: Optional[str] = None
+    
     avatar_url: Optional[str] = None
     reference_images: List[str] = []
+    
     class Config:
         from_attributes = True
+    
+    @field_validator("key_visual_traits", mode="before")
+    @classmethod
+    def ensure_list(cls, v):
+        """确保key_visual_traits是列表,将NULL转换为空列表"""
+        if v is None:
+            return []
+        return v
 
     @field_validator("avatar_url", mode="after")
     @classmethod
