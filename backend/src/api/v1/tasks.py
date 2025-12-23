@@ -9,7 +9,7 @@ from src.api.dependencies import get_current_user_required
 from src.api.schemas.task import TaskStatusResponse
 from src.core.logging import get_logger
 from src.models.user import User
-from src.tasks.task import celery_app
+from src.tasks.app import celery_app
 
 logger = get_logger(__name__)
 

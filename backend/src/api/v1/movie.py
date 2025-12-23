@@ -18,7 +18,7 @@ from src.api.schemas.movie import (
     CharacterGenerateRequest, KeyframeGenerateRequest,
     ShotUpdateRequest
 )
-from src.tasks.task import movie_produce_shot
+from src.tasks.movie import movie_produce_shot
 
 logger = get_logger(__name__)
 
@@ -65,7 +65,7 @@ async def extract_characters(
     """
     从剧本中提取角色（异步任务）
     """
-    from src.tasks.task import movie_extract_characters
+    from src.tasks.movie import movie_extract_characters
     task = movie_extract_characters.delay(script_id, req.api_key_id, req.model)
     return {"task_id": task.id, "message": "角色提取任务已提交"}
 
@@ -108,7 +108,7 @@ async def generate_character_avatar(
     """
     提交角色头像生成任务到 Celery
     """
-    from src.tasks.task import movie_generate_character_avatar
+    from src.tasks.movie import movie_generate_character_avatar
     task = movie_generate_character_avatar.delay(character_id, req.api_key_id, req.model, req.prompt, req.style)
     return {"task_id": task.id, "message": "角色头像生成任务已提交"}
 
@@ -122,7 +122,7 @@ async def generate_keyframes(
     """
     提交剧本分镜首帧图批量生成任务到 Celery
     """
-    from src.tasks.task import movie_generate_keyframes
+    from src.tasks.movie import movie_generate_keyframes
     task = movie_generate_keyframes.delay(script_id, req.api_key_id, req.model)
     return {"task_id": task.id, "message": "分镜首帧生成任务已提交"}
 
@@ -136,7 +136,7 @@ async def produce_shot(
     """
     提交镜头的视频生产任务到 Celery
     """
-    from src.tasks.task import movie_produce_shot
+    from src.tasks.movie import movie_produce_shot
     task = movie_produce_shot.delay(shot_id, req.api_key_id, req.model)
     return {"task_id": task.id, "message": "视频生产任务已提交"}
 
@@ -150,7 +150,7 @@ async def batch_produce_videos(
     """
     提交剧本所有分镜的批量视频生产任务到 Celery
     """
-    from src.tasks.task import movie_batch_produce_shots
+    from src.tasks.movie import movie_batch_produce_shots
     task = movie_batch_produce_shots.delay(script_id, req.api_key_id, req.model)
     return {"task_id": task.id, "message": "批量视频生产任务已提交"}
 
@@ -164,7 +164,7 @@ async def regenerate_keyframe(
     """
     强制重新生成某个分镜的首帧 (异步)
     """
-    from src.tasks.task import movie_regenerate_keyframe
+    from src.tasks.movie import movie_regenerate_keyframe
     task = movie_regenerate_keyframe.delay(shot_id, req.api_key_id, req.model)
     return {"task_id": task.id, "message": "首帧重制任务已提交"}
 
@@ -178,7 +178,7 @@ async def regenerate_last_frame(
     """
     强制重新生成某个分镜的尾帧 (异步)
     """
-    from src.tasks.task import movie_regenerate_last_frame
+    from src.tasks.movie import movie_regenerate_last_frame
     task = movie_regenerate_last_frame.delay(shot_id, req.api_key_id, req.model)
     return {"task_id": task.id, "message": "尾帧重制任务已提交"}
 
@@ -192,7 +192,7 @@ async def regenerate_video(
     """
     强制重新启动某个分镜的视频生产 (异步)
     """
-    from src.tasks.task import movie_produce_shot
+    from src.tasks.movie import movie_produce_shot
     task = movie_produce_shot.delay(shot_id, req.api_key_id, req.model, force=True)
     return {"task_id": task.id, "message": "视频重制任务已提交"}
 
@@ -218,10 +218,11 @@ async def check_script_completion(
     检查剧本的所有分镜是否已完成视频生成
     返回详细的统计信息
     """
-    from src.services.movie_production import movie_production_service
+    from src.services.movie_production import MovieProductionService
     
     try:
-        completion_status = await movie_production_service.check_script_completion(script_id)
+        mp_service = MovieProductionService(db)
+        completion_status = await mp_service.check_script_completion(script_id)
         return completion_status
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

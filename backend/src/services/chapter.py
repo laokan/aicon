@@ -112,7 +112,7 @@ class ChapterService(BaseService):
                 status=ModelChapterStatus.PENDING,
             )
 
-            await self.add(chapter)
+            self.add(chapter)
             await self.flush()  # 获取数据库生成的ID
 
             # 更新段落数据中的章节ID并创建段落
@@ -593,7 +593,6 @@ class ChapterService(BaseService):
         需要验证该章节的所有分镜视频都已生成完成
         """
         from src.models.movie import MovieScript
-        from src.services.movie_production import movie_production_service
         
         # 1. 获取章节
         chapter = await self.get_chapter_by_id(chapter_id)
@@ -609,7 +608,9 @@ class ChapterService(BaseService):
             raise BusinessLogicError(message="该章节尚未生成剧本，无法进入素材准备阶段")
         
         # 3. 检查剧本完成度
-        completion_status = await movie_production_service.check_script_completion(str(script.id))
+        from src.services.movie_production import MovieProductionService
+        movie_prod_service = MovieProductionService(self.db_session)
+        completion_status = await movie_prod_service.check_script_completion(str(script.id))
         
         if not completion_status["is_complete"]:
             raise BusinessLogicError(

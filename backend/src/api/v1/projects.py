@@ -119,7 +119,7 @@ async def create_project(
         )
 
     # 投递Celery解析任务
-    from src.tasks.task import process_uploaded_file
+    from src.tasks.project import process_uploaded_file
     task = process_uploaded_file.delay(str(project.id), current_user.id)
 
     logger.info(f"项目 {project.id} 创建成功，已投递解析任务: {task.id}")
@@ -166,7 +166,7 @@ async def create_project_from_text(
         )
 
     # 投递Celery解析任务
-    from src.tasks.task import process_uploaded_file
+    from src.tasks.project import process_uploaded_file
     task = process_uploaded_file.delay(str(project.id), current_user.id)
 
     logger.info(f"从文本创建项目 {project.id} 成功，已投递解析任务: {task.id}")
@@ -284,7 +284,7 @@ async def retry_project(
         )
 
     # 投递重试任务
-    from src.tasks.task import retry_failed_project
+    from src.tasks.project import retry_failed_project
     task = retry_failed_project.delay(project_id, current_user.id)
 
     logger.info(f"项目 {project_id} 重试任务已投递: {task.id}")
@@ -318,8 +318,9 @@ async def get_project_status(
             )
 
         # 获取处理状态详情
-        from src.services.project_processing import project_processing_service
-        processing_details = await project_processing_service.get_processing_status(project_id)
+        from src.services.project_processing import ProjectProcessingService
+        pp_service = ProjectProcessingService(db)
+        processing_details = await pp_service.get_processing_status(project_id)
 
         # 判断是否可以重试
         can_retry = project.status == "failed"

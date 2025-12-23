@@ -23,7 +23,7 @@ from src.models.video_task import VideoTaskStatus
 from src.services.video_task import VideoTaskService
 from src.services.chapter import ChapterService
 from src.services.project import ProjectService
-from src.tasks.task import synthesize_video
+from src.tasks.generate import synthesize_video
 
 logger = get_logger(__name__)
 

@@ -11,7 +11,6 @@
 - 系统健康检查
 
 设计原则：
-- 使用SessionManagedService独立管理会话
 - 协调多个服务完成复杂业务流程
 - 提供完整的处理状态跟踪
 - 异常处理和回滚机制
@@ -30,7 +29,7 @@ from src.models.chapter import Chapter
 from src.models.paragraph import Paragraph
 from src.models.project import Project, ProjectStatus
 from src.models.sentence import Sentence
-from src.services.base import SessionManagedService
+from src.services.base import BaseService
 from src.utils.encoding_detector import decode_file_content
 from src.utils.file_handlers import get_file_handler
 from src.utils.storage import get_storage_client
@@ -38,7 +37,7 @@ from src.utils.storage import get_storage_client
 logger = get_logger(__name__)
 
 
-class ProjectProcessingService(SessionManagedService):
+class ProjectProcessingService(BaseService):
     """
     项目文件处理服务 - 统一的项目处理接口
 
@@ -50,15 +49,14 @@ class ProjectProcessingService(SessionManagedService):
     5. 系统健康检查 - 多组件状态监控
 
     设计特点：
-    - 会话自管理：使用 SessionManagedService 独立管理数据库会话
     - 异步优先：所有操作都是异步的，支持高并发
     - 容错设计：完善的错误处理和恢复机制
     - 可观测性：详细的日志记录和状态跟踪
     - 可扩展性：模块化设计便于功能扩展
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, db_session: Any):
+        super().__init__(db_session)
         self._text_parser_service = None
         self._storage_client = None
         # 延迟导入避免循环依赖和初始化开销
@@ -228,7 +226,8 @@ class ProjectProcessingService(SessionManagedService):
         elif status == ProjectStatus.PARSED:
             project.error_message = None
 
-        await self.flush()
+        await self.commit()
+        await self.refresh(project)
         logger.debug(f"更新项目状态: ID={project.id}, 状态={status.value}, 进度={progress}%")
 
     async def _parse_text_content(self, project_id: str, file_content: str) -> Tuple[List[Dict], List[Dict], List[Dict]]:
@@ -367,24 +366,23 @@ class ProjectProcessingService(SessionManagedService):
             NotFoundError: 当项目不存在或文件路径无效时
             ValueError: 当文件无法读取或解码时
         """
-        # 使用外部数据库会话获取项目信息
-        async with get_async_db() as db:
-            project = await db.get(Project, project_id)
-            if not project or not project.file_path:
-                raise ValueError(f"项目或文件路径无效: {project_id}")
+        # 使用服务内部会话获取项目信息
+        project = await self.get(Project, project_id)
+        if not project or not project.file_path:
+            raise ValueError(f"项目或文件路径无效: {project_id}")
 
-            # 从存储下载文件
-            storage = await self._get_storage_client()
-            data = await storage.download_file(project.file_path)
+        # 从存储下载文件
+        storage = await self._get_storage_client()
+        data = await storage.download_file(project.file_path)
 
-            file_type = project.file_type
-            handler = get_file_handler(file_type)
+        file_type = project.file_type
+        handler = get_file_handler(file_type)
 
-            # 创建临时文件处理
-            suffix = Path(project.file_path).suffix
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as fp:
-                fp.write(data)
-                temp_path = fp.name
+        # 创建临时文件处理
+        suffix = Path(project.file_path).suffix
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as fp:
+            fp.write(data)
+            temp_path = fp.name
 
             try:
                 # 尝试使用文件处理器读取
@@ -401,7 +399,6 @@ class ProjectProcessingService(SessionManagedService):
                 except Exception as decode_error:
                     logger.error(f"无法解码文件 {project.file_path}: {decode_error}")
                     raise ValueError(f"无法解码文件: {project.file_path}")
-            finally:
                 # 清理临时文件
                 try:
                     import os
@@ -424,11 +421,11 @@ class ProjectProcessingService(SessionManagedService):
         from src.services.project import ProjectService
 
         try:
-            # 使用外部数据库会话更新项目状态
-            async with get_async_db() as db:
-                service = ProjectService(db)
-                await service.mark_processing_failed(project_id, owner_id, message)
-                logger.info(f"项目 {project_id} 已标记为失败状态: {message}")
+            # 使用服务内部会话更新项目状态
+            from src.services.project import ProjectService
+            service = ProjectService(self.db_session)
+            await service.mark_processing_failed(project_id, owner_id, message)
+            logger.info(f"项目 {project_id} 已标记为失败状态: {message}")
         except Exception as e:
             logger.error(f"更新项目失败状态时出错: {e}")
             # 即使状态更新失败，也记录错误，但不抛出异常
@@ -470,11 +467,10 @@ class ProjectProcessingService(SessionManagedService):
             content = await self.get_file_content(project_id)
 
             # 2. 处理文件内容
-            async with self:
-                result = await self.process_uploaded_file(
-                    project_id=project_id,
-                    file_content=content
-                )
+            result = await self.process_uploaded_file(
+                project_id=project_id,
+                file_content=content
+            )
 
             # 3. 验证处理结果
             if not result.get("success", True):
@@ -517,29 +513,28 @@ class ProjectProcessingService(SessionManagedService):
             NotFoundError: 当项目不存在时
         """
         try:
-            # 使用外部数据库会话查询项目信息
-            async with get_async_db() as db:
-                project = await db.get(Project, project_id)
-                if not project:
-                    raise NotFoundError("项目不存在", resource_type="project", resource_id=project_id)
+            # 使用服务内部会话查询项目信息
+            project = await self.get(Project, project_id)
+            if not project:
+                raise NotFoundError("项目不存在", resource_type="project", resource_id=project_id)
 
-                # 根据项目状态构建响应
-                response = {
-                    "success": True,
-                    "chapters_count": project.chapter_count or 0,
-                    "paragraphs_count": project.paragraph_count or 0,
-                    "sentences_count": project.sentence_count or 0,
-                    "word_count": project.word_count or 0,
-                    "status": project.status,
-                    "progress": project.processing_progress or 0,
-                    "message": self._get_status_message(project.status),
-                    "error_message": project.error_message,
-                    "created_at": project.created_at.isoformat() if project.created_at else None,
-                    "updated_at": project.updated_at.isoformat() if project.updated_at else None,
-                }
+            # 根据项目状态构建响应
+            response = {
+                "success": True,
+                "chapters_count": project.chapter_count or 0,
+                "paragraphs_count": project.paragraph_count or 0,
+                "sentences_count": project.sentence_count or 0,
+                "word_count": project.word_count or 0,
+                "status": project.status,
+                "progress": project.processing_progress or 0,
+                "message": self._get_status_message(project.status),
+                "error_message": project.error_message,
+                "created_at": project.created_at.isoformat() if project.created_at else None,
+                "updated_at": project.updated_at.isoformat() if project.updated_at else None,
+            }
 
-                logger.debug(f"项目 {project_id} 状态查询: {project.status} ({response['progress']}%)")
-                return response
+            logger.debug(f"项目 {project_id} 状态查询: {project.status} ({response['progress']}%)")
+            return response
 
         except Exception as e:
             logger.error(f"获取项目 {project_id} 处理状态失败: {e}")
@@ -602,36 +597,35 @@ class ProjectProcessingService(SessionManagedService):
         from src.services.project import ProjectService
 
         # 验证项目状态并重置
-        async with get_async_db() as db:
-            service = ProjectService(db)
-            project = await service.get_project_by_id(project_id, owner_id)
+        from src.services.project import ProjectService
+        service = ProjectService(self.db_session)
+        project = await service.get_project_by_id(project_id, owner_id)
 
-            if not project:
-                raise ValueError(f"项目不存在: {project_id}")
+        if not project:
+            raise ValueError(f"项目不存在: {project_id}")
 
-            if project.status != "failed":
-                return {
-                    "success": False,
-                    "message": f"项目不是失败状态: {project.status}"
-                }
+        if project.status != "failed":
+            return {
+                "success": False,
+                "message": f"项目不是失败状态: {project.status}"
+            }
 
-            # 重置项目状态
-            project.status = "uploaded"
-            project.error_message = None
-            project.processing_progress = 0
-            await db.commit()
+        # 重置项目状态
+        project.status = "uploaded"
+        project.error_message = None
+        project.processing_progress = 0
+        await self.commit()
 
-            logger.info(f"项目 {project_id} 状态已重置，开始重新处理")
+        logger.info(f"项目 {project_id} 状态已重置，开始重新处理")
 
         # 获取文件内容并重新处理
         try:
             content = await self.get_file_content(project_id)
             # 使用当前服务实例处理文件
-            async with self:
-                result = await self.process_uploaded_file(
-                    project_id=project_id,
-                    file_content=content
-                )
+            result = await self.process_uploaded_file(
+                project_id=project_id,
+                file_content=content
+            )
 
             return {
                 "success": True,
@@ -645,26 +639,11 @@ class ProjectProcessingService(SessionManagedService):
             raise
 
 
-# 全局实例
-project_processing_service = ProjectProcessingService()
-
 __all__ = [
     'ProjectProcessingService',
-    'project_processing_service',
 ]
 
 if __name__ == "__main__":
     import asyncio
 
 
-    async def main():
-        service = ProjectProcessingService()
-        # 在这里可以调用服务方法进行测试
-        project_id = "77c6f798-b2d2-43ee-8473-2692bfaa449c"
-        owner_id = "5ffef73b-8b2b-471d-8f63-eb055114f17f"
-        print("Processing file task...")
-        res = await service.process_file_task(project_id, owner_id)
-        print(res)
-
-
-    asyncio.run(main())

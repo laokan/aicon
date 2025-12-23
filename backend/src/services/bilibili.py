@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import tempfile
+from sqlalchemy.ext.asyncio import AsyncSession
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
@@ -15,7 +16,7 @@ from sqlalchemy import select
 
 from src.core.logging import get_logger
 from src.core.config import settings
-from src.services.base import BaseService, SessionManagedService
+from src.services.base import BaseService
 
 logger = get_logger(__name__)
 
@@ -274,7 +275,7 @@ class BilibiliService(BaseService):
 
 
 
-class BilibiliPublishService(SessionManagedService):
+class BilibiliPublishService(BaseService):
     """
     Bilibili发布服务 - 管理发布任务业务逻辑
     
@@ -282,20 +283,15 @@ class BilibiliPublishService(SessionManagedService):
     1. 发布任务流程管理 - 从视频下载到上传的完整流程
     2. 状态跟踪管理 - 实时进度更新和错误处理
     3. 临时文件管理 - 下载、清理临时文件
-    
-    设计特点:
-    - 会话自管理: 使用SessionManagedService独立管理数据库会话
-    - 异步优先: 所有操作都是异步的
-    - 容错设计: 完善的错误处理和恢复机制
     """
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, db_session: AsyncSession = None):
+        super().__init__(db_session)
         self._bilibili_service = None
         self._storage_service = None
     
-    async def _get_bilibili_service(self):
-        """延迟导入bilibili_service"""
+    def _get_bilibili_service(self):
+        """获取bilibili_service"""
         if self._bilibili_service is None:
             self._bilibili_service = BilibiliService(self.db_session)
         return self._bilibili_service
@@ -315,21 +311,11 @@ class BilibiliPublishService(SessionManagedService):
     ) -> Dict[str, Any]:
         """
         上传视频任务的视频到B站的完整任务流程
-        
-        专门为Celery任务调用设计,提供完整的异常处理和状态管理。
-        
-        Args:
-            publish_task_id: 发布任务ID
-            user_id: 用户ID
-            celery_task_id: Celery任务ID
-            
-        Returns:
-            上传结果
         """
         from src.models.publish_task import PublishTask
         from src.models.video_task import VideoTask
         
-        publish_task = None  # Initialize to ensure it's available in exception handler
+        publish_task = None
         
         try:
             logger.info(f"开始Bilibili上传任务: publish_task_id={publish_task_id}")
@@ -366,7 +352,7 @@ class BilibiliPublishService(SessionManagedService):
                 cover_path = await self._download_cover(publish_task.cover_url)
             
             # 6. 获取cookie文件
-            bilibili_service = await self._get_bilibili_service()
+            bilibili_service = self._get_bilibili_service()
             
             # 优先使用指定账号的cookie
             if publish_task.account_id:
@@ -417,15 +403,11 @@ class BilibiliPublishService(SessionManagedService):
             
         except Exception as e:
             logger.error(f"上传任务异常: {e}", exc_info=True)
-            
-            # 标记任务失败
             if publish_task:
                 publish_task.mark_as_failed(str(e))
                 await self.commit()
-            
             raise
         finally:
-            # 8. 清理临时文件 (moved to finally to ensure cleanup even on failure)
             if 'video_path' in locals():
                 self._cleanup_temp_file(video_path)
             if 'cover_path' in locals() and cover_path:
@@ -434,34 +416,20 @@ class BilibiliPublishService(SessionManagedService):
     async def _download_video_from_minio(self, video_key: str) -> str:
         """从MinIO下载视频到临时文件"""
         storage_service = await self._get_storage_service()
-        
-        # 创建临时文件
         temp_dir = Path(tempfile.gettempdir()) / "biliup_uploads"
         temp_dir.mkdir(parents=True, exist_ok=True)
-        
         temp_file = temp_dir / f"video_{os.urandom(8).hex()}.mp4"
-        
-        # 下载视频
         await storage_service.download_file_to_path(video_key, str(temp_file))
-        
-        logger.info(f"视频已从MinIO下载到: {temp_file}")
         return str(temp_file)
     
     async def _download_cover(self, cover_url: str) -> str:
         """下载封面到临时文件"""
         storage_service = await self._get_storage_service()
-        
         temp_dir = Path(tempfile.gettempdir()) / "biliup_uploads"
         temp_dir.mkdir(parents=True, exist_ok=True)
-        
-        # 根据URL确定文件扩展名
         ext = Path(cover_url).suffix or ".jpg"
         temp_file = temp_dir / f"cover_{os.urandom(8).hex()}{ext}"
-        
-        # 下载封面
         await storage_service.download_file_to_path(cover_url, str(temp_file))
-        
-        logger.info(f"封面已下载到: {temp_file}")
         return str(temp_file)
     
     def _cleanup_temp_file(self, file_path: str):
@@ -469,16 +437,11 @@ class BilibiliPublishService(SessionManagedService):
         try:
             if os.path.exists(file_path):
                 os.unlink(file_path)
-                logger.info(f"已清理临时文件: {file_path}")
         except Exception as e:
             logger.warning(f"清理临时文件失败: {e}")
 
 
-# 全局实例
-bilibili_publish_service = BilibiliPublishService()
-
 __all__ = [
     "BilibiliService",
     "BilibiliPublishService",
-    "bilibili_publish_service",
 ]

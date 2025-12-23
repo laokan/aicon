@@ -17,7 +17,7 @@ from src.core.logging import get_logger
 from src.models.chapter import Chapter, ChapterStatus
 from src.models.user import User
 from src.services.project import ProjectService
-from src.tasks.task import generate_prompts as generate_prompts_task, generate_prompts_by_ids
+from src.tasks.generate import generate_prompts as generate_prompts_task, generate_prompts_by_ids
 
 logger = get_logger(__name__)
 

@@ -110,7 +110,7 @@ class ProjectService(BaseService):
                 status=ProjectStatus.UPLOADED
             )
 
-            await self.add(project)
+            self.add(project)
             await self.flush()  # 获取数据库生成的ID
 
             # 提交事务

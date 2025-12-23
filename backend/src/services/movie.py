@@ -52,7 +52,7 @@ class MovieService(BaseService):
             await self.db_session.commit()
             logger.info(f"Deleted existing script {existing_script.id} for chapter {chapter_id}")
         
-        from src.tasks.task import movie_generate_script
+        from src.tasks.movie import movie_generate_script
         task = movie_generate_script.delay(chapter_id, api_key_id, model)
         return task.id
 

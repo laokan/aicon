@@ -71,7 +71,7 @@ class VideoTaskService(BaseService):
             if gen_setting:
                 video_task.set_gen_setting(gen_setting)
 
-            await self.add(video_task)
+            self.add(video_task)
             await self.commit()
             await self.refresh(video_task)
 

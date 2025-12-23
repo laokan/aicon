@@ -111,7 +111,7 @@ class ParagraphService(BaseService):
                 is_confirmed=False
             )
 
-            await self.add(paragraph)
+            self.add(paragraph)
             await self.flush()  # 获取数据库生成的ID
 
             # 创建句子数据

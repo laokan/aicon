@@ -1,5 +1,6 @@
 from src.core.logging import get_logger
-from src.services.base import SessionManagedService
+from src.services.base import BaseService
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = get_logger(__name__)
 
@@ -8,9 +9,9 @@ logger = get_logger(__name__)
 # VideoService 主体
 # ============================================================
 
-class VideoService(SessionManagedService):
-    def __init__(self):
-        super().__init__()
+class VideoService(BaseService):
+    def __init__(self, db_session: AsyncSession):
+        super().__init__(db_session)
         logger.info("✅ VideoService 初始化完成")
         
     
@@ -34,15 +35,4 @@ class VideoService(SessionManagedService):
         # 4.合成章节视频
 
 
-video_service = VideoService()
-__all__ = ["VideoService", "video_service"]
-
-if __name__ == "__main__":
-    import asyncio
-
-
-    async def test():
-        service = VideoService()
-
-
-    asyncio.run(test())
+__all__ = ["VideoService"]

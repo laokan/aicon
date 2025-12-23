@@ -3,18 +3,24 @@
 """
 
 from typing import Optional
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.logging import get_logger
 from src.models.movie import MovieShot, MovieCharacter, MovieScene, MovieScript
-from src.services.base import SessionManagedService
+from src.services.base import BaseService
 from src.services.provider.factory import ProviderFactory
 from src.services.api_key import APIKeyService
 
 logger = get_logger(__name__)
 
-class DialoguePromptEngine(SessionManagedService):
+class DialoguePromptEngine(BaseService):
     """
     对话表现力提示词生成服务
+    要求外部注入 AsyncSession。
     """
+
+    def __init__(self, db_session: AsyncSession):
+        super().__init__(db_session)
 
     PERFORMANCE_DESIGN_PROMPT = """
 你是一个顶级的表演指导。请根据分镜内容和角色对话，设计出精密的**视觉表现提示词**。
@@ -38,55 +44,53 @@ class DialoguePromptEngine(SessionManagedService):
         """
         为分镜设计对话表现提示词
         """
-        async with self:
-            shot = await self.db_session.get(MovieShot, shot_id)
-            if not shot: raise ValueError("未找到分镜")
-            
-            char_traits = "Unknown character"
-            if character_id:
-                character = await self.db_session.get(MovieCharacter, character_id)
-                if character:
-                    char_traits = f"{character.name}: {character.visual_traits}, voice style: {character.dialogue_traits}"
+        shot = await self.db_session.get(MovieShot, shot_id)
+        if not shot: raise ValueError("未找到分镜")
+        
+        char_traits = "Unknown character"
+        if character_id:
+            character = await self.db_session.get(MovieCharacter, character_id)
+            if character:
+                char_traits = f"{character.name}: {character.visual_traits}, voice style: {character.dialogue_traits}"
 
-            # 加载 API Key (假设从项目 owner 获取)
-            from src.models.chapter import Chapter
-            stmt = select(Chapter).join(MovieScript).join(MovieScene).where(MovieScene.id == shot.scene_id)
-            chapter = (await self.db_session.execute(stmt)).scalar_one_or_none()
-            
-            api_key_service = APIKeyService(self.db_session)
-            api_key = await api_key_service.get_api_key_by_id(api_key_id, str(chapter.project.owner_id))
-            
-            llm_provider = ProviderFactory.create(
-                provider=api_key.provider,
-                api_key=api_key.get_api_key(),
-                base_url=api_key.base_url
+        # 加载 API Key (假设从项目 owner 获取)
+        from src.models.chapter import Chapter
+        stmt = select(Chapter).join(MovieScript).join(MovieScene).where(MovieScene.id == shot.scene_id)
+        chapter = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        
+        api_key_service = APIKeyService(self.db_session)
+        api_key = await api_key_service.get_api_key_by_id(api_key_id, str(chapter.project.owner_id))
+        
+        llm_provider = ProviderFactory.create(
+            provider=api_key.provider,
+            api_key=api_key.get_api_key(),
+            base_url=api_key.base_url
+        )
+
+        try:
+            system_prompt = "你是一个专业的AI视频提示词优化专家。只输出提示词文本。"
+            user_prompt = self.PERFORMANCE_DESIGN_PROMPT.format(
+                char_traits=char_traits,
+                dialogue=shot.dialogue or "None",
+                visual_desc=shot.visual_description,
+                performance_hint=shot.performance_prompt or "None"
             )
+            
+            response = await llm_provider.completions(
+                model="deepseek-chat", # 默认
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ]
+            )
+            
+            performance_prompt = response.choices[0].message.content.strip()
+            shot.performance_prompt = performance_prompt
+            await self.db_session.commit()
+            return performance_prompt
+            
+        except Exception as e:
+            logger.error(f"生成对话表现提示词失败: {e}")
+            raise
 
-            try:
-                system_prompt = "你是一个专业的AI视频提示词优化专家。只输出提示词文本。"
-                user_prompt = self.PERFORMANCE_DESIGN_PROMPT.format(
-                    char_traits=char_traits,
-                    dialogue=shot.dialogue or "None",
-                    visual_desc=shot.visual_description,
-                    performance_hint=shot.performance_prompt or "None"
-                )
-                
-                response = await llm_provider.completions(
-                    model="deepseek-chat", # 默认
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ]
-                )
-                
-                performance_prompt = response.choices[0].message.content.strip()
-                shot.performance_prompt = performance_prompt
-                await self.db_session.commit()
-                return performance_prompt
-                
-            except Exception as e:
-                logger.error(f"生成对话表现提示词失败: {e}")
-                raise
-
-dialogue_prompt_engine = DialoguePromptEngine()
-__all__ = ["DialoguePromptEngine", "dialogue_prompt_engine"]
+__all__ = ["DialoguePromptEngine"]

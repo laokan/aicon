@@ -5,7 +5,7 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from sqlalchemy import Engine, event
+from sqlalchemy import Engine, event, text
 from sqlalchemy.ext.asyncio import (AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine)
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import QueuePool
@@ -143,7 +143,7 @@ async def test_database_connection() -> bool:
             await create_database_engine()
 
         async with AsyncSessionLocal() as session:
-            result = await session.execute("SELECT 1")
+            result = await session.execute(text("SELECT 1"))
             row = result.first()
             return row and row[0] == 1
 

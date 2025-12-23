@@ -63,19 +63,19 @@ migrate-down: ## 回滚最后一次数据库迁移
 
 worker: ## 启动Celery Worker
 	@echo "$(BLUE)🔄 启动Celery Worker...$(RESET)"
-	$(UV) run celery -A src.tasks.task worker --loglevel=info --concurrency=4
+	$(UV) run celery -A src.tasks.app worker --loglevel=info --concurrency=4
 
 beat: ## 启动Celery beat
 	@echo "$(BLUE)🔄 启动Celery Beat...$(RESET)"
-	$(UV) run celery -A src.tasks.task beat --loglevel=info
+	$(UV) run celery -A src.tasks.app beat --loglevel=info
 
 beat_w: ## 在windows下启动Celery Beat
 	@echo "$(BLUE)⏰ 在windows下启动Celery Beat...$(RESET)"
-	$(UV) run celery -A src.tasks.task beat --loglevel=info --loglevel=info --pool=threads
+	$(UV) run celery -A src.tasks.app beat --loglevel=info --loglevel=info --pool=threads
 
 worker_w: ## 启动Celery Worker
 	@echo "$(BLUE)🔄 在windows下启动Celery Worker...$(RESET)"
-	$(UV) run celery -A src.tasks.task worker --loglevel=info --pool=threads --concurrency=4
+	$(UV) run celery -A src.tasks.app worker --loglevel=info --pool=threads --concurrency=4
 
 test: ## 运行所有测试
 	@echo "$(BLUE)🧪 运行测试...$(RESET)"

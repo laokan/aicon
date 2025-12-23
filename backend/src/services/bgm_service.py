@@ -90,7 +90,7 @@ class BGMService(BaseService):
                 status=BGMStatus.ACTIVE,
             )
 
-            await self.add(bgm)
+            self.add(bgm)
             await self.commit()
             await self.refresh(bgm)
 

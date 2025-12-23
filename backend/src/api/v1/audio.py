@@ -12,7 +12,7 @@ from src.core.exceptions import NotFoundError, BusinessLogicError
 from src.core.logging import get_logger
 from src.models.chapter import Chapter
 from src.models.user import User
-from src.tasks.task import generate_audio
+from src.tasks.generate import generate_audio
 
 logger = get_logger(__name__)
 

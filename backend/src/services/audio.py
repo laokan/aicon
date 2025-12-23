@@ -12,7 +12,7 @@ from src.core.exceptions import NotFoundError
 from src.core.logging import get_logger
 from src.models import Sentence, SentenceStatus, Paragraph, Chapter
 from src.services.api_key import APIKeyService
-from src.services.base import SessionManagedService
+from src.services.base import BaseService
 from src.services.provider.base import BaseLLMProvider
 from src.services.provider.factory import ProviderFactory
 from src.utils.storage import get_storage_client
@@ -156,83 +156,81 @@ async def process_sentence(
 # AudioService 主体
 # ============================================================
 
-class AudioService(SessionManagedService):
+class AudioService(BaseService):
 
     async def generate_audio(self, api_key_id: str, sentence_ids: List[str], voice: str = "alloy",
                              model: str = "tts-1") -> dict:
-        async with self:
-            # --- 1. 查询 Sentence ----
-            stmt = (
-                select(Sentence)
-                .where(Sentence.id.in_(sentence_ids))
-                .options(
-                    selectinload(Sentence.paragraph)
-                    .selectinload(Paragraph.chapter)
-                    .selectinload(Chapter.project)
-                )
+        # --- 1. 查询 Sentence ----
+        stmt = (
+            select(Sentence)
+            .where(Sentence.id.in_(sentence_ids))
+            .options(
+                selectinload(Sentence.paragraph)
+                .selectinload(Paragraph.chapter)
+                .selectinload(Chapter.project)
             )
-            result = await self.execute(stmt)
-            sentences = result.scalars().all()
+        )
+        result = await self.execute(stmt)
+        sentences = result.scalars().all()
 
-            if not sentences:
-                raise NotFoundError("未找到待处理句子")
+        if not sentences:
+            raise NotFoundError("未找到待处理句子")
 
-            chapter = sentences[0].paragraph.chapter
-            user_id = chapter.project.owner_id
+        chapter = sentences[0].paragraph.chapter
+        user_id = chapter.project.owner_id
 
-            # --- 2. 获取 API Key ---
-            api_key_service = APIKeyService(self.db_session)
-            api_key = await api_key_service.get_api_key_by_id(api_key_id, user_id)
+        # --- 2. 获取 API Key ---
+        api_key_service = APIKeyService(self.db_session)
+        api_key = await api_key_service.get_api_key_by_id(api_key_id, user_id)
 
-            # --- 3. LLM Provider ---
-            llm_provider = ProviderFactory.create(
-                provider=api_key.provider,
-                api_key=api_key.get_api_key(),
-                max_concurrency=5,
-                base_url=api_key.base_url if api_key.base_url else None,
-            )
-            logger.info(f"[LLM] 使用 Provider: {llm_provider}, API Key ID: {api_key.id},Base URL: {api_key.base_url}")
+        # --- 3. LLM Provider ---
+        llm_provider = ProviderFactory.create(
+            provider=api_key.provider,
+            api_key=api_key.get_api_key(),
+            max_concurrency=5,
+            base_url=api_key.base_url if api_key.base_url else None,
+        )
+        logger.info(f"[LLM] 使用 Provider: {llm_provider}, API Key ID: {api_key.id},Base URL: {api_key.base_url}")
 
-            # --- 4. 创建统一并发控制 ---
-            semaphore = asyncio.Semaphore(5)
+        # --- 4. 创建统一并发控制 ---
+        semaphore = asyncio.Semaphore(5)
 
-            # --- 5. 创建任务列表 ---
-            storage_client = await get_storage_client()
-            tasks = [
-                process_sentence(sentence, llm_provider, semaphore, storage_client, user_id, voice, model)
-                for sentence in sentences
-            ]
+        # --- 5. 创建任务列表 ---
+        storage_client = await get_storage_client()
+        tasks = [
+            process_sentence(sentence, llm_provider, semaphore, storage_client, user_id, voice, model)
+            for sentence in sentences
+        ]
 
-            logger.info(f"[LLM] 开始并发处理音频，共 {len(tasks)} 项")
+        logger.info(f"[LLM] 开始并发处理音频，共 {len(tasks)} 项")
 
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            # 统计成功和失败数量
-            success_count = 0
-            failed_count = 0
-            for res in results:
-                if isinstance(res, Exception) or res is False:
-                    failed_count += 1
-                else:
-                    success_count += 1
+        # 统计成功和失败数量
+        success_count = 0
+        failed_count = 0
+        for res in results:
+            if isinstance(res, Exception) or res is False:
+                failed_count += 1
+            else:
+                success_count += 1
 
-            await api_key_service.update_usage(api_key.id, user_id)
+        await api_key_service.update_usage(api_key.id, user_id)
 
-            # --- 7. 提交数据库 ---
-            await self.db_session.flush()
-            await self.db_session.commit()
+        # --- 7. 提交数据库 ---
+        await self.db_session.flush()
+        await self.db_session.commit()
 
-            logger.info("[FINISH] 所有音频任务完成")
+        logger.info("[FINISH] 所有音频任务完成")
 
-            # 返回统计信息
-            statistics = {
-                "total": len(sentences),
-                "success": success_count,
-                "failed": failed_count
-            }
-            logger.info(f"[STATS] 音频生成统计: {statistics}")
-            return statistics
+        # 返回统计信息
+        statistics = {
+            "total": len(sentences),
+            "success": success_count,
+            "failed": failed_count
+        }
+        logger.info(f"[STATS] 音频生成统计: {statistics}")
+        return statistics
 
 
-audio_service = AudioService()
-__all__ = ["AudioService", "audio_service"]
+__all__ = ["AudioService"]

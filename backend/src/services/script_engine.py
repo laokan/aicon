@@ -11,17 +11,18 @@ from sqlalchemy.orm import selectinload
 from src.core.logging import get_logger
 from src.models.movie import MovieScript, MovieScene, MovieShot, ScriptStatus
 from src.models.chapter import Chapter
-from src.services.base import SessionManagedService
+from src.services.base import BaseService
 from src.services.provider.factory import ProviderFactory
 from src.services.api_key import APIKeyService
 
 logger = get_logger(__name__)
 
-class ScriptEngineService(SessionManagedService):
+class ScriptEngineService(BaseService):
     """
     剧本引擎服务
     1. 改编剧本：章节 -> 场景 (Scenes)
     2. 拆分分镜：场景 -> 镜头 (Shots)
+    要求外部注入 AsyncSession。
     """
 
     ADAPT_CHAPTER_PROMPT = """
@@ -84,7 +85,7 @@ class ScriptEngineService(SessionManagedService):
 2. **视觉细节**：包含光影、构图、色调、人物表情、动作等
 3. **连贯性**：首帧和尾帧要体现动作的起始和结束
 4. **风格统一**：保持电影质感，cinematic style
-5. **简洁明确**：避免冗余，每个提示词控制在100词以内
+5. **简洁明确**：避免冗余信息，确保提示词细节丰富。
 """
 
     async def _generate_shot_prompts(self, shot: MovieShot, scene: MovieScene, llm_provider, model: str = None) -> Dict[str, str]:
@@ -198,100 +199,101 @@ class ScriptEngineService(SessionManagedService):
         """
         根据章节内容生成剧本和分镜
         """
-        async with self:
-            # 1. 加载章节和API Key
-            chapter = await self.db_session.get(Chapter, chapter_id, options=[selectinload(Chapter.project)])
-            if not chapter:
-                raise ValueError("未找到章节")
+        # 1. 加载章节和API Key
+        chapter = await self.db_session.get(Chapter, chapter_id, options=[selectinload(Chapter.project)])
+        if not chapter:
+            raise ValueError("未找到章节")
 
-            api_key_service = APIKeyService(self.db_session)
-            api_key = await api_key_service.get_api_key_by_id(api_key_id, str(chapter.project.owner_id))
+        api_key_service = APIKeyService(self.db_session)
+        api_key = await api_key_service.get_api_key_by_id(api_key_id, str(chapter.project.owner_id))
+        
+        # 2. 调用 LLM
+        llm_provider = ProviderFactory.create(
+            provider=api_key.provider,
+            api_key=api_key.get_api_key(),
+            base_url=api_key.base_url
+        )
+        
+        logger.info(f"开始为章节 {chapter.id} 生成剧本，使用模型 {model} 和提供者 {api_key.provider}")
+        # 更新剧本状态
+        script = MovieScript(chapter_id=chapter.id, status=ScriptStatus.GENERATING)
+        self.db_session.add(script)
+        await self.db_session.flush()
+
+        try:
+            if on_progress:
+                await on_progress(0.1, "正在生成剧本结构...")
             
-            # 2. 调用 LLM
-            llm_provider = ProviderFactory.create(
-                provider=api_key.provider,
-                api_key=api_key.get_api_key(),
-                base_url=api_key.base_url
+            prompt = self.ADAPT_CHAPTER_PROMPT.format(text=chapter.content)
+            response = await llm_provider.completions(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "你是一个专业的电影剧本JSON生成器。只输出JSON。"},
+                    {"role": "user", "content": prompt},
+                ],
+                response_format={ "type": "json_object" }
             )
             
-            # 更新剧本状态
-            script = MovieScript(chapter_id=chapter.id, status=ScriptStatus.GENERATING)
-            self.db_session.add(script)
-            await self.db_session.flush()
-
-            try:
-                if on_progress:
-                    await on_progress(0.1, "正在生成剧本结构...")
+            content = response.choices[0].message.content.strip()
+            # 兼容某些模型不带 json_object 的情况，手动清理代码块
+            if content.startswith("```json"):
+                content = content[7:-3].strip()
+            elif content.startswith("```"):
+                content = content[3:-3].strip()
                 
-                prompt = self.ADAPT_CHAPTER_PROMPT.format(text=chapter.content)
-                response = await llm_provider.completions(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": "你是一个专业的电影剧本JSON生成器。只输出JSON。"},
-                        {"role": "user", "content": prompt},
-                    ],
-                    response_format={ "type": "json_object" }
+            script_data = json.loads(content)
+            logger.info(f"剧本结构生成结果: {script_data}")
+            
+            # 3. 解析并保存数据
+            created_scenes = []
+            for scene_data in script_data.get("scenes", []):
+                scene = MovieScene(
+                    script_id=script.id,
+                    order_index=scene_data.get("order_index"),
+                    location=scene_data.get("location"),
+                    time_of_day=scene_data.get("time_of_day"),
+                    atmosphere=scene_data.get("atmosphere"),
+                    description=scene_data.get("description"),
+                    shots=[]
                 )
+                created_scenes.append(scene)
+                self.db_session.add(scene)
+                await self.db_session.flush()
                 
-                content = response.choices[0].message.content.strip()
-                # 兼容某些模型不带 json_object 的情况，手动清理代码块
-                if content.startswith("```json"):
-                    content = content[7:-3].strip()
-                elif content.startswith("```"):
-                    content = content[3:-3].strip()
-                    
-                script_data = json.loads(content)
-                
-                # 3. 解析并保存数据
-                created_scenes = []
-                for scene_data in script_data.get("scenes", []):
-                    scene = MovieScene(
-                        script_id=script.id,
-                        order_index=scene_data.get("order_index"),
-                        location=scene_data.get("location"),
-                        time_of_day=scene_data.get("time_of_day"),
-                        atmosphere=scene_data.get("atmosphere"),
-                        description=scene_data.get("description")
+                for shot_data in scene_data.get("shots", []):
+                    shot = MovieShot(
+                        scene_id=scene.id,
+                        order_index=shot_data.get("order_index"),
+                        visual_description=shot_data.get("visual_description"),
+                        camera_movement=shot_data.get("camera_movement"),
+                        dialogue=shot_data.get("dialogue"),
+                        performance_prompt=shot_data.get("performance_description")
                     )
-                    created_scenes.append(scene)
-                    self.db_session.add(scene)
-                    await self.db_session.flush()
-                    
-                    for shot_data in scene_data.get("shots", []):
-                        shot = MovieShot(
-                            scene_id=scene.id,
-                            order_index=shot_data.get("order_index"),
-                            visual_description=shot_data.get("visual_description"),
-                            camera_movement=shot_data.get("camera_movement"),
-                            dialogue=shot_data.get("dialogue"),
-                            performance_prompt=shot_data.get("performance_description")
-                        )
-                        scene.shots.append(shot)
-                        self.db_session.add(shot)
-                
-                if on_progress:
-                    await on_progress(0.4, "剧本结构生成完成，开始生成精细提示词...")
+                    scene.shots.append(shot)
+                    self.db_session.add(shot)
+            
+            if on_progress:
+                await on_progress(0.4, "剧本结构生成完成，开始生成精细提示词...")
 
-                script.status = ScriptStatus.COMPLETED
-                
-                # 4. 并发生成所有分镜的首尾帧提示词
-                logger.info("开始生成分镜提示词...")
-                await self._generate_all_frame_prompts(created_scenes, llm_provider, model, on_progress=on_progress)
-                
-                if on_progress:
-                    await on_progress(0.9, "提示词生成完成，正在保存...")
+            script.status = ScriptStatus.COMPLETED
+            
+            # 4. 并发生成所有分镜的首尾帧提示词
+            logger.info("开始生成分镜提示词...")
+            await self._generate_all_frame_prompts(created_scenes, llm_provider, model, on_progress=on_progress)
+            
+            if on_progress:
+                await on_progress(0.9, "提示词生成完成，正在保存...")
 
-                await self.db_session.commit()
-                return script
-                
-            except Exception as e:
-                logger.error(f"生成剧本失败: {e}")
-                script.status = ScriptStatus.FAILED
-                await self.db_session.commit()
-                raise
+            await self.db_session.commit()
+            return script
+            
+        except Exception as e:
+            logger.error(f"生成剧本失败: {e}")
+            script.status = ScriptStatus.FAILED
+            await self.db_session.commit()
+            raise
 
-script_engine_service = ScriptEngineService()
-__all__ = ["ScriptEngineService", "script_engine_service"]
+__all__ = ["ScriptEngineService"]
 
 if __name__ == "__main__":
     import asyncio
@@ -306,20 +308,18 @@ if __name__ == "__main__":
         3. 替换下面的 chapter_id 和 api_key_id
         4. 运行: python -m src.services.script_engine
         """
-        service = ScriptEngineService()
-        
-        # TODO: 替换为实际的 chapter_id 和 api_key_id
-        chapter_id = "your-chapter-id-here"
-        api_key_id = "your-api-key-id-here"
-        model = "gemini-2.0-flash-exp"  # 或其他模型
-        
         try:
-            print(f"开始生成剧本: chapter_id={chapter_id}")
-            script = await service.generate_script(
-                chapter_id=chapter_id,
-                api_key_id=api_key_id,
-                model=model
-            )
+            from src.core.database import get_async_db
+            
+            async with get_async_db() as db:
+                service = ScriptEngineService(db)
+                
+                print(f"开始生成剧本: chapter_id={chapter_id}")
+                script = await service.generate_script(
+                    chapter_id=chapter_id,
+                    api_key_id=api_key_id,
+                    model=model
+                )
             print(f"剧本生成成功: script_id={script.id}")
             print(f"场景数量: {len(script.scenes)}")
             

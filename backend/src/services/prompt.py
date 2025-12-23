@@ -19,7 +19,7 @@ from src.core.logging import get_logger
 from src.models import Sentence, APIKey, ChapterStatus, SentenceStatus, Paragraph, Chapter
 from src.services import ChapterService
 from src.services.api_key import APIKeyService
-from src.services.base import SessionManagedService
+from src.services.base import BaseService
 from src.services.provider.base import BaseLLMProvider
 from src.services.provider.factory import ProviderFactory
 
@@ -99,7 +99,7 @@ async def process_sentence(
 # 主业务服务类
 # ============================================================
 
-class PromptService(SessionManagedService):
+class PromptService(BaseService):
     """
     提示词生成服务
 
@@ -262,31 +262,20 @@ class PromptService(SessionManagedService):
     async def generate_prompts_batch(self, chapter_id: str, api_key_id: str, style: str = "cinematic", model: str = None, custom_prompt: str = None) -> dict:
         """
         批量生成提示词（按章节 ID 获取所有待处理句子）
-
-        Args:
-            chapter_id (str): 章节 ID
-            api_key_id (str): API Key ID
-            style (str): 生成风格
-            model (str): 模型名称
-            custom_prompt (str): 自定义系统提示词
-            
-        Returns:
-            dict: 统计信息 {"total": int, "success": int, "failed": int}
         """
-        async with self:
-            # 查询章节句子
-            chapter_service = ChapterService(self.db_session)
-            sentences = await chapter_service.get_sentences(chapter_id)
+        # 查询章节句子
+        chapter_service = ChapterService(self.db_session)
+        sentences = await chapter_service.get_sentences(chapter_id)
 
-            if not sentences:
-                raise NotFoundError("未找到待处理句子", resource_id=chapter_id, resource_type="chapter")
+        if not sentences:
+            raise NotFoundError("未找到待处理句子", resource_id=chapter_id, resource_type="chapter")
 
-            # 加载 API Key
-            user_id = sentences[0].paragraph.chapter.project.owner_id
-            api_key = await self._load_api_key(api_key_id, user_id)
+        # 加载 API Key
+        user_id = sentences[0].paragraph.chapter.project.owner_id
+        api_key = await self._load_api_key(api_key_id, user_id)
 
-            # 统一执行批量处理
-            return await self._generate_prompts(sentences, api_key, style, True, model, custom_prompt)
+        # 统一执行批量处理
+        return await self._generate_prompts(sentences, api_key, style, True, model, custom_prompt)
 
     # ============================================================
     # 对外方法：按句子 ID 数组处理
@@ -295,40 +284,28 @@ class PromptService(SessionManagedService):
     async def generate_prompts_by_ids(self, sentence_ids: List[str], api_key_id: str, style: str = "cinematic", model: str = None, custom_prompt: str = None) -> dict:
         """
         批量生成提示词（按句子 ID 列表处理）
-
-        Args:
-            sentence_ids (List[str]): 多个句子 ID
-            api_key_id (str): API Key ID
-            style (str): 生成风格
-            model (str): 模型名称
-            custom_prompt (str): 自定义系统提示词
-            
-        Returns:
-            dict: 统计信息 {"total": int, "success": int, "failed": int}
         """
-        async with self:
-            # 根据 ID 查询句子
-            stmt = select(Sentence).where(Sentence.id.in_(sentence_ids)).options(
-                selectinload(Sentence.paragraph).selectinload(Paragraph.chapter).selectinload(Chapter.project)
+        # 根据 ID 查询句子
+        stmt = select(Sentence).where(Sentence.id.in_(sentence_ids)).options(
+            selectinload(Sentence.paragraph).selectinload(Paragraph.chapter).selectinload(Chapter.project)
+        )
+
+        result = await self.execute(stmt)
+        sentences = result.scalars().all()
+
+        if not sentences:
+            raise NotFoundError(
+                "未找到待处理句子",
+                resource_id=",".join(sentence_ids),
+                resource_type="sentence",
             )
 
-            result = await self.execute(stmt)
-            sentences = result.scalars().all()
+        # 加载 API Key
+        user_id = sentences[0].paragraph.chapter.project.owner_id
+        api_key = await self._load_api_key(api_key_id, user_id)
 
-            if not sentences:
-                raise NotFoundError(
-                    "未找到待处理句子",
-                    resource_id=",".join(sentence_ids),
-                    resource_type="sentence",
-                )
-
-            # 加载 API Key
-            user_id = sentences[0].paragraph.chapter.project.owner_id
-            api_key = await self._load_api_key(api_key_id, user_id)
-
-            # 执行批量生成
-            return await self._generate_prompts(sentences, api_key, style, False, model, custom_prompt)
+        # 执行批量生成
+        return await self._generate_prompts(sentences, api_key, style, False, model, custom_prompt)
 
 
-prompt_service = PromptService()
-__all__ = ["PromptService", "prompt_service"]
+__all__ = ["PromptService"]

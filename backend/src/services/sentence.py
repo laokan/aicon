@@ -72,7 +72,7 @@ class SentenceService(BaseService):
             status=SentenceStatus.PENDING.value
         )
 
-        await self.add(sentence)
+        self.add(sentence)
         await self.commit()
         await self.refresh(sentence)
 
