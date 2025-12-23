@@ -57,8 +57,8 @@ class CustomProvider(BaseLLMProvider):
 
         # 检查是否是 Gemini 图像模型
         if model and "gemini" in model.lower():
-            # 调用 Gemini 专用方法
-            gemini_response = await self.generate_image_gemini(prompt)
+            # 调用 Gemini 专用方法，传递所有kwargs
+            gemini_response = await self.generate_image_gemini(prompt, **kwargs)
 
             # 将 Gemini 响应包装成兼容格式
             return self._wrap_gemini_response(gemini_response)
@@ -68,19 +68,6 @@ class CustomProvider(BaseLLMProvider):
             return await self.client.images.generate(
                 model=model or "Kwai-Kolors/Kolors", prompt=prompt, **kwargs
             )
-
-    async def generate_image_with_references(self, prompt: str, reference_images: List[str], model: str = None, **kwargs: Any):
-        """
-        支持参考图的生图接口
-        """
-        # 将 reference_images 作为 extra_body 参数传递给 OpenAI SDK
-        # 注意: 具体字段名需根据实际厂商 API 调整，这里作为 extra_body 传递
-        extra_body = kwargs.pop("extra_body", {})
-        if reference_images:
-            extra_body["image_prompts"] = reference_images # 适配部分厂商
-            extra_body["ref_images"] = reference_images    # 适配部分厂商
-        
-        return await self.generate_image(prompt, model, extra_body=extra_body, **kwargs)
 
     @log_provider_call("generate_audio")
     async def generate_audio(
@@ -166,6 +153,23 @@ class CustomProvider(BaseLLMProvider):
         reference_images = kwargs.get("reference_images")
         if reference_images:
             import base64
+            from src.utils.storage import get_storage_client
+            
+            logger.info(f"处理 {len(reference_images)} 张参考图")
+            
+            # 检查是否是MinIO key (以"uploads/"开头)
+            if reference_images and reference_images[0].startswith("uploads/"):
+                logger.info("检测到MinIO key,转换为presigned URL")
+                storage_client = await get_storage_client()
+                converted_urls = []
+                for key in reference_images[:5]:  # 最大5张
+                    try:
+                        presigned_url = await storage_client.get_presigned_url(key, expires=3600)
+                        converted_urls.append(presigned_url)
+                        logger.debug(f"MinIO key转URL: {key[:30]}...")
+                    except Exception as e:
+                        logger.warning(f"MinIO key转URL失败 {key}: {e}")
+                reference_images = converted_urls
             
             # 最大支持 5 张参考图
             for img_url in reference_images[:5]:
@@ -176,15 +180,23 @@ class CustomProvider(BaseLLMProvider):
                             if resp.status == 200:
                                 img_data = await resp.read()
                                 b64_img = base64.b64encode(img_data).decode('utf-8')
+                                
+                                # 检测MIME类型
+                                mime_type = "image/jpeg"
+                                if img_data[:4] == b'\x89PNG':
+                                    mime_type = "image/png"
+                                
                                 parts.append({
                                     "inline_data": {
-                                        "mime_type": "image/jpeg", # 假设 jpeg, 实际应检测
+                                        "mime_type": mime_type,
                                         "data": b64_img
                                     }
                                 })
-                                logger.info(f"添加参考图到 Gemini 提示词: {img_url}")
+                                logger.info(f"成功添加参考图: {img_url[:50]}...")
+                            else:
+                                logger.warning(f"下载参考图失败 HTTP {resp.status}: {img_url[:50]}...")
                 except Exception as e:
-                    logger.warning(f"下载参考图失败 {img_url}: {e}")
+                    logger.warning(f"处理参考图失败 {img_url[:50]}...: {e}")
 
         payload = {
             "contents": [{"role": "user", "parts": parts}],
@@ -204,39 +216,4 @@ class CustomProvider(BaseLLMProvider):
                         
                     result = await resp.text()
                     return json.loads(result)
-
-    def _wrap_gemini_response(self, gemini_response: dict):
-        """
-        将 Gemini 图像生成响应转换为 OpenAI 格式
-        Gemini 返回: {"candidates": [{"content": {"parts": [{"inlineData": {...}}]}}]}
-        OpenAI 格式: {"data": [{"url": "data:image/jpeg;base64,..."}]}
-        """
-        try:
-            # 提取第一个候选结果
-            candidate = gemini_response.get("candidates", [{}])[0]
-            content = candidate.get("content", {})
-            parts = content.get("parts", [])
-            
-            # 查找图像数据部分
-            for part in parts:
-                if "inlineData" in part:
-                    inline_data = part["inlineData"]
-                    mime_type = inline_data.get("mimeType", "image/jpeg")
-                    base64_data = inline_data.get("data", "")
-                    
-                    # 构造 data URL
-                    data_url = f"data:{mime_type};base64,{base64_data}"
-                    
-                    # 返回 OpenAI 兼容格式
-                    from types import SimpleNamespace
-                    return SimpleNamespace(
-                        data=[SimpleNamespace(url=data_url)]
-                    )
-            
-            # 如果没找到图像数据
-            raise ValueError("Gemini 响应中未找到图像数据")
-            
-        except Exception as e:
-            logger.error(f"解析 Gemini 响应失败: {e}, 原始响应: {gemini_response}")
-            raise ValueError(f"无法解析 Gemini 图像响应: {e}")
 

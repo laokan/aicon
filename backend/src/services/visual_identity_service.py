@@ -22,6 +22,78 @@ from src.services.image import retry_with_backoff
 logger = get_logger(__name__)
 
 # ============================================================
+# 辅助函数
+# ============================================================
+
+def _normalize_character_name(name: str) -> str:
+    """标准化角色名称,移除括号内容"""
+    import re
+    return re.sub(r'\s*\([^)]*\)', '', name).strip()
+
+
+def _character_appears_in_shot(char_name: str, shot: MovieShot) -> bool:
+    """
+    智能判断角色是否出现在镜头中
+    使用多种策略:
+    1. 完整名称匹配
+    2. 标准化名称匹配(移除括号)
+    3. 名字部分匹配(中文名或英文名)
+    """
+    import re
+    
+    # 合并镜头描述和对白
+    full_text = f"{shot.visual_description or ''} {shot.dialogue or ''}"
+    
+    # 策略1: 完整名称匹配
+    if char_name in full_text:
+        return True
+    
+    # 策略2: 标准化名称匹配
+    normalized_char = _normalize_character_name(char_name)
+    if normalized_char and normalized_char in full_text:
+        return True
+    
+    # 策略3: 提取括号内的英文名或中文名分别匹配
+    # 例如 "阿尔德里克 (Aldric)" -> ["阿尔德里克", "Aldric"]
+    parts = re.findall(r'([^\(\)]+)', char_name)
+    for part in parts:
+        part = part.strip()
+        if part and len(part) > 1 and part in full_text:
+            return True
+    
+    return False
+
+
+def _collect_character_references(chars: List[MovieCharacter], shot: MovieShot, max_refs: int = 3) -> List[str]:
+    """
+    收集镜头中出现角色的参考图
+    
+    Args:
+        chars: 所有角色列表
+        shot: 镜头对象
+        max_refs: 最大参考图数量
+        
+    Returns:
+        参考图URL列表(去重)
+    """
+    ref_images = []
+    matched_chars = []
+    
+    for char in chars:
+        if _character_appears_in_shot(char.name, shot):
+            matched_chars.append(char.name)
+            if char.avatar_url:
+                ref_images.append(char.avatar_url)
+    
+    # 去重并限制数量
+    ref_images = list(dict.fromkeys(ref_images))[:max_refs]
+    
+    if matched_chars:
+        logger.info(f"分镜 {str(shot.id)[:8]} 匹配到角色: {matched_chars}, 参考图数量: {len(ref_images)}")
+    
+    return ref_images
+
+# ============================================================
 # 独立 Worker 函数 (参照 image.py 规范)
 # ============================================================
 
@@ -40,36 +112,12 @@ async def _generate_one_frame_worker(
     单个分镜单帧生成的 Worker - 负责生成、下载、上传，不负责 Commit
     包含角色参考图以确保人物一致性
     """
+    import base64
+    
     async with semaphore:
         try:
             # 1. 构建 Prompt (包含角色信息)
             base_prompt = shot.first_frame_prompt if frame_type == "first" else shot.last_frame_prompt
-            
-            if not base_prompt:
-                # 分析镜头运动以生成更流畅的起始帧提示词 (Fallback)
-                camera_move = (shot.camera_movement or "").lower()
-                visual_desc = shot.visual_description
-                
-                if frame_type == "first":
-                    if "pan" in camera_move:
-                        variation = "Start of the pan shot, framing the initial composition"
-                    elif "zoom in" in camera_move:
-                        variation = "Wide shot, establishing context before the zoom"
-                    elif "zoom out" in camera_move:
-                        variation = "Close-up shot, detail view before zooming out"
-                    else:
-                        variation = "Cinematic establishing shot, start of action"
-                else:
-                    if "pan" in camera_move:
-                        variation = "End of the pan shot, revealing the new composition, continuous lighting"
-                    elif "zoom in" in camera_move:
-                        variation = "Close-up shot, result of the zoom in, focused details"
-                    elif "zoom out" in camera_move:
-                        variation = "Wide shot, result of the zoom out, revealing surroundings"
-                    else:
-                        variation = "End of action, evolved state, consistent lighting and atmosphere with start"
-
-                base_prompt = f"{visual_desc}. {shot.camera_movement or ''}. {variation}."
             
             character_context = ""
             for char in chars:
@@ -97,11 +145,10 @@ async def _generate_one_frame_worker(
                 "model": model
             }
             
-            # 某些 provider 支持参考图 (如 SiliconFlow)
-            # 这里简化处理，实际可能需要根据 provider 类型调整
-            if ref_images and hasattr(img_provider, 'generate_image_with_references'):
+            if ref_images:
                 gen_params["reference_images"] = ref_images
             
+            # 某些 provider 支持参考图 (如 SiliconFlow)        
             result = await retry_with_backoff(
                 lambda: img_provider.generate_image(**gen_params)
             )
@@ -230,14 +277,7 @@ class VisualIdentityService(BaseService):
         chars = (await self.db_session.execute(stmt)).scalars().all()
         
         # 收集角色参考图
-        ref_images = []
-        for char in chars:
-            if char.name in shot.visual_description or (shot.dialogue and char.name in shot.dialogue):
-                if char.avatar_url:
-                    ref_images.append(char.avatar_url)
-                if char.reference_images:
-                    ref_images.extend(char.reference_images)
-        ref_images = list(dict.fromkeys(ref_images))[:3]  # 去重并限制数量
+        ref_images = _collect_character_references(chars, shot)
         
         api_key_service = APIKeyService(self.db_session)
         api_key = await api_key_service.get_api_key_by_id(api_key_id, str(user_id))
@@ -266,14 +306,7 @@ class VisualIdentityService(BaseService):
         chars = (await self.db_session.execute(stmt)).scalars().all()
         
         # 收集角色参考图
-        ref_images = []
-        for char in chars:
-            if char.name in shot.visual_description or (shot.dialogue and char.name in shot.dialogue):
-                if char.avatar_url:
-                    ref_images.append(char.avatar_url)
-                if char.reference_images:
-                    ref_images.extend(char.reference_images)
-        ref_images = list(dict.fromkeys(ref_images))[:3]  # 去重并限制数量
+        ref_images = _collect_character_references(chars, shot)
         
         api_key_service = APIKeyService(self.db_session)
         api_key = await api_key_service.get_api_key_by_id(api_key_id, str(user_id))
@@ -323,40 +356,29 @@ class VisualIdentityService(BaseService):
             for shot in scene.shots:
                 # 检查是否需要生成首帧
                 if not shot.first_frame_url:
-                    # 收集角色参考图
-                    ref_images = []
-                    for char in chars:
-                        if char.name in shot.visual_description or (shot.dialogue and char.name in shot.dialogue):
-                            if char.avatar_url:
-                                ref_images.append(char.avatar_url)
-                            if char.reference_images:
-                                ref_images.extend(char.reference_images)
-                    ref_images = list(dict.fromkeys(ref_images))[:3]
-                    
+                    ref_images = _collect_character_references(chars, shot)
                     tasks.append(
                         _generate_one_frame_worker(shot, chars, user_id, api_key, "first", model, semaphore, storage_client, ref_images)
                     )
                 
                 # 检查是否需要生成尾帧
                 if not shot.last_frame_url:
-                    # 重复收集参考图逻辑 (也可以提取为 helper)
-                    ref_images = []
-                    for char in chars:
-                        if char.name in shot.visual_description or (shot.dialogue and char.name in shot.dialogue):
-                            if char.avatar_url:
-                                ref_images.append(char.avatar_url)
-                            if char.reference_images:
-                                ref_images.extend(char.reference_images)
-                    ref_images = list(dict.fromkeys(ref_images))[:3]
-                    
+                    ref_images = _collect_character_references(chars, shot)
                     tasks.append(
                         _generate_one_frame_worker(shot, chars, user_id, api_key, "last", model, semaphore, storage_client, ref_images)
                     )
         
+        # 5. 无任务则返回
         if not tasks:
             return {"total": 0, "success": 0, "failed": 0, "message": "所有分镜已有首尾帧"}
 
         # 6. 执行并发
+        
+        
+        # 测试时 只取一个任务
+        tasks = tasks[:1]
+        
+        
         results = await asyncio.gather(*tasks)
         
         success_count = sum(1 for r in results if r)
@@ -373,3 +395,19 @@ class VisualIdentityService(BaseService):
         }
 
 __all__ = ["VisualIdentityService"]
+
+
+if __name__ == "__main__":
+    # 测试关键帧生成
+    import asyncio
+    
+    async def test():
+        from src.core.database import get_async_db
+        async with get_async_db() as session:
+            vis_service = VisualIdentityService(session)
+            script_id = "cd1b2680-5d39-4b08-8bf1-968ec05a1571"
+            api_key_id = "457f4337-8f54-4749-a2d6-78e1febf9028"
+            stats = await vis_service.batch_generate_keyframes(script_id, api_key_id, model="gemini-3-pro-image-preview")
+            print(stats)
+
+    asyncio.run(test())
