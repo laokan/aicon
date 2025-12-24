@@ -1,18 +1,17 @@
 import api, { get, post, put } from './api'
 
+/**
+ * 电影生成相关服务
+ * 遵循项目架构：所有API调用通过service层，composables不直接使用api
+ */
 export const movieService = {
-    /**
-     * 从章节提取场景（新架构）
-     */
-    extractScenes(chapterId, data) {
-        return post(`/movie/chapters/${chapterId}/scenes`, data)
-    },
+    // ==================== 角色管理 ====================
 
     /**
-     * 获取章节关联的剧本详情
+     * 获取项目的角色列表
      */
-    getScript(chapterId) {
-        return get(`/movie/chapters/${chapterId}/script`)
+    getCharacters(projectId) {
+        return get(`/movie/projects/${projectId}/characters`)
     },
 
     /**
@@ -23,14 +22,7 @@ export const movieService = {
     },
 
     /**
-     * 获取项目下的角色列表
-     */
-    getCharacters(projectId) {
-        return get(`/movie/projects/${projectId}/characters`)
-    },
-
-    /**
-     * 生成角色头像
+     * 生成角色形象
      */
     generateCharacterAvatar(characterId, data) {
         return post(`/movie/characters/${characterId}/generate`, data)
@@ -50,6 +42,24 @@ export const movieService = {
         return api.delete(`/movie/characters/${characterId}`)
     },
 
+    // ==================== 场景管理 ====================
+
+    /**
+     * 获取章节关联的剧本详情
+     */
+    getScript(chapterId) {
+        return get(`/movie/chapters/${chapterId}/script`)
+    },
+
+    /**
+     * 从章节提取场景（新架构）
+     */
+    extractScenes(chapterId, data) {
+        return post(`/movie/chapters/${chapterId}/scenes`, data)
+    },
+
+    // ==================== 分镜管理 ====================
+
     /**
      * 从剧本提取分镜
      */
@@ -58,11 +68,22 @@ export const movieService = {
     },
 
     /**
+     * 更新分镜信息
+     */
+    updateShot(shotId, data) {
+        return put(`/movie/shots/${shotId}`, data)
+    },
+
+    // ==================== 关键帧管理 ====================
+
+    /**
      * 为剧本批量生成分镜关键帧
      */
     generateKeyframes(scriptId, data) {
         return post(`/movie/scripts/${scriptId}/generate-keyframes`, data)
     },
+
+    // ==================== 过渡视频管理 ====================
 
     /**
      * 创建过渡视频记录
@@ -86,10 +107,10 @@ export const movieService = {
     },
 
     /**
-     * 更新分镜信息
+     * 获取剧本的过渡列表
      */
-    updateShot(shotId, data) {
-        return put(`/movie/shots/${shotId}`, data)
+    getTransitions(scriptId) {
+        return get(`/movie/scripts/${scriptId}/transitions`)
     }
 }
 

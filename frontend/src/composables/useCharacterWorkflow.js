@@ -1,8 +1,13 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import movieService from '@/services/movie'
 import { useTaskPoller } from './useTaskPoller'
 
-export function useCharacterWorkflow(projectId, db) {
+/**
+ * 角色工作流管理
+ * 遵循架构：使用movieService而非直接调用api
+ */
+export function useCharacterWorkflow(projectId) {
     const characters = ref([])
     const extracting = ref(false)
     const generatingAvatarId = ref(null)
@@ -10,8 +15,9 @@ export function useCharacterWorkflow(projectId, db) {
     const loadCharacters = async () => {
         if (!projectId.value) return
         try {
-            const response = await db.get(`/movie/projects/${projectId.value}/characters`)
-            characters.value = response.data || []
+            const response = await movieService.getCharacters(projectId.value)
+            // 注意：response已经是data，不需要response.data
+            characters.value = response.characters || []
         } catch (error) {
             console.error('Failed to load characters:', error)
         }
@@ -20,15 +26,15 @@ export function useCharacterWorkflow(projectId, db) {
     const extractCharacters = async (scriptId, apiKeyId, model) => {
         extracting.value = true
         try {
-            const response = await db.post(`/movie/scripts/${scriptId}/extract-characters`, {
+            const response = await movieService.extractCharacters(scriptId, {
                 api_key_id: apiKeyId,
                 model
             })
 
-            if (response.data.task_id) {
+            if (response.task_id) {
                 ElMessage.success('角色提取任务已提交')
                 const { startPolling } = useTaskPoller()
-                startPolling(response.data.task_id, async () => {
+                startPolling(response.task_id, async () => {
                     ElMessage.success('角色提取完成')
                     await loadCharacters()
                     extracting.value = false
@@ -46,17 +52,17 @@ export function useCharacterWorkflow(projectId, db) {
     const generateAvatar = async (characterId, apiKeyId, model, prompt, style) => {
         generatingAvatarId.value = characterId
         try {
-            const response = await db.post(`/movie/characters/${characterId}/generate`, {
+            const response = await movieService.generateCharacterAvatar(characterId, {
                 api_key_id: apiKeyId,
                 model,
                 prompt,
                 style
             })
 
-            if (response.data.task_id) {
+            if (response.task_id) {
                 ElMessage.success('角色形象生成任务已提交')
                 const { startPolling } = useTaskPoller()
-                startPolling(response.data.task_id, async () => {
+                startPolling(response.task_id, async () => {
                     ElMessage.success('角色形象生成成功')
                     await loadCharacters()
                     generatingAvatarId.value = null
@@ -73,15 +79,15 @@ export function useCharacterWorkflow(projectId, db) {
 
     const batchGenerateAvatars = async (apiKeyId, model) => {
         try {
-            const response = await db.post(`/movie/projects/${projectId.value}/characters/batch-generate`, {
+            const response = await movieService.batchGenerateAvatars(projectId.value, {
                 api_key_id: apiKeyId,
                 model
             })
 
-            if (response.data.task_id) {
+            if (response.task_id) {
                 ElMessage.success('批量生成任务已提交')
                 const { startPolling } = useTaskPoller()
-                startPolling(response.data.task_id, async (result) => {
+                startPolling(response.task_id, async (result) => {
                     ElMessage.success(`批量生成完成: 成功 ${result.success}, 失败 ${result.failed}`)
                     await loadCharacters()
                 }, (error) => {
@@ -95,7 +101,7 @@ export function useCharacterWorkflow(projectId, db) {
 
     const deleteCharacter = async (characterId) => {
         try {
-            await db.delete(`/movie/characters/${characterId}`)
+            await movieService.deleteCharacter(characterId)
             ElMessage.success('角色已删除')
             await loadCharacters()
         } catch (error) {

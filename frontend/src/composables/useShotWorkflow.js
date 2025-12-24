@@ -1,8 +1,13 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import movieService from '@/services/movie'
 import { useTaskPoller } from './useTaskPoller'
 
-export function useShotWorkflow(script, db) {
+/**
+ * 分镜工作流管理
+ * 遵循架构：使用movieService而非直接调用api
+ */
+export function useShotWorkflow(script) {
     const extracting = ref(false)
     const generatingKeyframes = ref(false)
 
@@ -16,15 +21,15 @@ export function useShotWorkflow(script, db) {
     const extractShots = async (scriptId, apiKeyId, model) => {
         extracting.value = true
         try {
-            const response = await db.post(`/movie/scripts/${scriptId}/extract-shots`, {
+            const response = await movieService.extractShots(scriptId, {
                 api_key_id: apiKeyId,
                 model
             })
 
-            if (response.data.task_id) {
+            if (response.task_id) {
                 ElMessage.success('分镜提取任务已提交')
                 const { startPolling } = useTaskPoller()
-                startPolling(response.data.task_id, async (result) => {
+                startPolling(response.task_id, async (result) => {
                     ElMessage.success(`分镜提取完成: 成功 ${result.success}, 失败 ${result.failed}`)
                     extracting.value = false
                     // Reload script to get shots
@@ -43,15 +48,15 @@ export function useShotWorkflow(script, db) {
     const generateKeyframes = async (scriptId, apiKeyId, model) => {
         generatingKeyframes.value = true
         try {
-            const response = await db.post(`/movie/scripts/${scriptId}/generate-keyframes`, {
+            const response = await movieService.generateKeyframes(scriptId, {
                 api_key_id: apiKeyId,
                 model
             })
 
-            if (response.data.task_id) {
+            if (response.task_id) {
                 ElMessage.success('关键帧生成任务已提交')
                 const { startPolling } = useTaskPoller()
-                startPolling(response.data.task_id, async (result) => {
+                startPolling(response.task_id, async (result) => {
                     if (result.failed > 0) {
                         ElMessage.warning(`关键帧生成部分完成: 成功 ${result.success}, 失败 ${result.failed}`)
                     } else {

@@ -1,16 +1,22 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import movieService from '@/services/movie'
 import { useTaskPoller } from './useTaskPoller'
 
-export function useSceneWorkflow(db) {
+/**
+ * 场景工作流管理
+ * 遵循架构：使用movieService而非直接调用api
+ */
+export function useSceneWorkflow() {
     const script = ref(null)
     const extracting = ref(false)
 
     const loadScript = async (chapterId) => {
         if (!chapterId) return
         try {
-            const response = await db.get(`/movie/chapters/${chapterId}/script`)
-            script.value = response.data
+            const response = await movieService.getScript(chapterId)
+            // response已经是data
+            script.value = response
         } catch (error) {
             console.error('Failed to load script:', error)
             script.value = null
@@ -20,15 +26,15 @@ export function useSceneWorkflow(db) {
     const extractScenes = async (chapterId, apiKeyId, model) => {
         extracting.value = true
         try {
-            const response = await db.post(`/movie/chapters/${chapterId}/scenes`, {
+            const response = await movieService.extractScenes(chapterId, {
                 api_key_id: apiKeyId,
                 model
             })
 
-            if (response.data.task_id) {
+            if (response.task_id) {
                 ElMessage.success('场景提取任务已提交')
                 const { startPolling } = useTaskPoller()
-                startPolling(response.data.task_id, async () => {
+                startPolling(response.task_id, async () => {
                     ElMessage.success('场景提取完成')
                     await loadScript(chapterId)
                     extracting.value = false

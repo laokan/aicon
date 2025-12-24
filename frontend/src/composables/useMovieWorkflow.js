@@ -1,17 +1,19 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '@/services/api'
 import { useCharacterWorkflow } from './useCharacterWorkflow'
 import { useSceneWorkflow } from './useSceneWorkflow'
 import { useShotWorkflow } from './useShotWorkflow'
 import { useTransitionWorkflow } from './useTransitionWorkflow'
 
+/**
+ * 电影工作流主控制器
+ * 遵循架构：不传递api实例，让子workflow自己使用service
+ */
 export function useMovieWorkflow() {
     const route = useRoute()
     const router = useRouter()
 
     const selectedChapterId = ref(route.params.chapterId || null)
-    // 从route.params获取projectId（路由中定义的参数）
     const projectId = ref(route.params.projectId || null)
     const currentStep = ref(0)
     const loading = ref(false)
@@ -22,11 +24,11 @@ export function useMovieWorkflow() {
         routeParams: route.params
     })
 
-    // Initialize workflows
-    const characterWorkflow = useCharacterWorkflow(projectId, api)
-    const sceneWorkflow = useSceneWorkflow(api)
-    const shotWorkflow = useShotWorkflow(sceneWorkflow.script, api)
-    const transitionWorkflow = useTransitionWorkflow(api)
+    // Initialize workflows - 不传递api实例
+    const characterWorkflow = useCharacterWorkflow(projectId)
+    const sceneWorkflow = useSceneWorkflow()
+    const shotWorkflow = useShotWorkflow(sceneWorkflow.script)
+    const transitionWorkflow = useTransitionWorkflow()
 
     // Computed states
     const canExtractScenes = computed(() => {
@@ -67,7 +69,7 @@ export function useMovieWorkflow() {
         }
     }
 
-    // Load initial data (only characters, not script)
+    // Load initial data
     const loadData = async () => {
         if (!selectedChapterId.value || !projectId.value) {
             console.warn('Cannot load data: missing chapterId or projectId')
@@ -76,17 +78,16 @@ export function useMovieWorkflow() {
 
         loading.value = true
         try {
-            // Only load characters initially
+            // Load characters
             await characterWorkflow.loadCharacters()
 
-            // Try to load script if it exists, but don't fail if it doesn't
+            // Try to load script if it exists
             try {
                 await sceneWorkflow.loadScript(selectedChapterId.value)
                 if (sceneWorkflow.script.value) {
                     await transitionWorkflow.loadTransitions(sceneWorkflow.script.value.id)
                 }
             } catch (error) {
-                // Script doesn't exist yet, that's OK - user will create it
                 console.log('No script found for this chapter yet')
             }
 
