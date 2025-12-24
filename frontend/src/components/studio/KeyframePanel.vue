@@ -138,7 +138,7 @@
     <el-dialog
       v-model="showKeyframeDialog"
       :title="keyframeDialogType === 'generate' ? '生成关键帧' : '重新生成关键帧'"
-      width="600px"
+      width="700px"
     >
       <el-form :model="keyframeFormData" label-width="100px">
         <el-form-item label="API Key">
@@ -169,13 +169,17 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="提示词">
+        <el-form-item label="生成提示词">
           <el-input
             v-model="keyframeFormData.prompt"
             type="textarea"
-            :rows="4"
-            placeholder="可选：自定义图像生成提示词"
+            :rows="12"
+            placeholder="专业提示词（可编辑调整）"
+            style="font-family: monospace; font-size: 12px;"
           />
+          <div style="margin-top: 8px; color: #909399; font-size: 12px;">
+            💡 提示词已包含场景、分镜和角色信息，强调真人电影风格。您可以根据需要调整。
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -325,7 +329,7 @@ const handleGenerateKeyframe = (shot) => {
   keyframeFormData.value = {
     apiKeyId: props.apiKeys[0]?.id || '',
     model: '',
-    prompt: shot.shot || ''
+    prompt: shot.generated_prompt || shot.shot || ''
   }
   showKeyframeDialog.value = true
 }
@@ -336,7 +340,7 @@ const handleRegenerateKeyframe = (shot) => {
   keyframeFormData.value = {
     apiKeyId: props.apiKeys[0]?.id || '',
     model: '',
-    prompt: shot.shot || ''
+    prompt: shot.generated_prompt || shot.shot || ''
   }
   showKeyframeDialog.value = true
 }

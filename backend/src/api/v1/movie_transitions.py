@@ -14,6 +14,24 @@ from src.api.schemas.movie import TransitionGenerateRequest
 logger = get_logger(__name__)
 router = APIRouter()
 
+@router.get("/scripts/{script_id}/transitions", summary="获取剧本的过渡列表")
+async def get_transitions(
+    script_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+):
+    """获取剧本的所有过渡视频记录"""
+    from src.services.transition_service import TransitionService
+    from sqlalchemy import select
+    from src.models.movie import MovieTransition
+    
+    # 查询该剧本的所有过渡
+    stmt = select(MovieTransition).where(MovieTransition.script_id == script_id)
+    result = await db.execute(stmt)
+    transitions = result.scalars().all()
+    
+    return {"transitions": transitions}
+
 @router.post("/scripts/{script_id}/create-transitions", summary="创建过渡视频记录")
 async def create_transitions(
     script_id: str,

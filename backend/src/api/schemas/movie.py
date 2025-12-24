@@ -18,24 +18,6 @@ class ShotExtractRequest(BaseModel):
     api_key_id: str
     model: Optional[str] = None
 
-class ShotBase(BaseModel):
-    """分镜基础信息"""
-    order_index: int
-    shot: Optional[str] = None
-    dialogue: Optional[str] = None
-    characters: List[str] = []
-    keyframe_url: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
-    
-    @field_validator("keyframe_url", mode="after")
-    @classmethod
-    def sign_urls(cls, v: Optional[str]) -> Optional[str]:
-        if v and not v.startswith("http"):
-            return storage_client.get_presigned_url(v, timedelta(hours=24))
-        return v
-
 class MovieShotBase(BaseModel):
     scene_id: UUID4
     order_index: int
@@ -50,6 +32,14 @@ class MovieShotBase(BaseModel):
         if isinstance(v, uuid.UUID):
             return str(v)
         return v
+    
+    @field_validator("keyframe_url", mode="after")
+    @classmethod
+    def sign_keyframe_url(cls, v: Optional[str]) -> Optional[str]:
+        """为keyframe_url生成预签名URL"""
+        if v and not v.startswith("http"):
+            return storage_client.get_presigned_url(v, timedelta(hours=24))
+        return v
 
 class MovieShotResponse(MovieShotBase):
     id: str
@@ -57,22 +47,23 @@ class MovieShotResponse(MovieShotBase):
     updated_at: datetime
     generated_prompt: Optional[str] = None  # 专业提示词（用于前端显示和调整）
     
+    @field_validator("id", mode="before")
+    @classmethod
+    def convert_id_to_str(cls, v):
+        """将UUID类型的id转换为字符串"""
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
+    
     class Config:
         from_attributes = True
-    
-    @field_validator("keyframe_url", mode="after")
-    @classmethod
-    def sign_urls(cls, v: Optional[str]) -> Optional[str]:
-        if v and not v.startswith("http"):
-            return storage_client.get_presigned_url(v, timedelta(hours=24))
-        return v
 
 class MovieSceneBase(BaseModel):
     id: UUID4
     order_index: int
     scene: str
     characters: List[str] = []
-    shots: List[MovieShotBase]
+    shots: List['MovieShotResponse']  # 使用MovieShotResponse以包含generated_prompt
     
     class Config:
         from_attributes = True
