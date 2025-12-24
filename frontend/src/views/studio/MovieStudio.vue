@@ -22,7 +22,7 @@
       </div>
 
       <!-- 工作流步骤指示器 -->
-      <WorkflowStepper :current-step="currentStep" />
+      <WorkflowStepper :current-step="currentStep" @change-step="handleStepChange" />
 
       <!-- 内容区 -->
       <div class="studio-body" v-loading="loading">
@@ -37,7 +37,8 @@
             :characters="characterWorkflow.characters.value"
             :extracting="characterWorkflow.extracting.value"
             :generating-id="characterWorkflow.generatingAvatarId.value"
-            :can-extract="!!sceneWorkflow.script.value"
+            :can-extract="true"
+            :api-keys="apiKeys"
             @extract-characters="handleExtractCharacters"
             @generate-avatar="handleGenerateAvatar"
             @delete-character="handleDeleteCharacter"
@@ -126,6 +127,7 @@ import TransitionPanel from '@/components/studio/TransitionPanel.vue'
 import StudioDialogs from '@/components/studio/StudioDialogs.vue'
 
 import { useMovieWorkflow } from '@/composables/useMovieWorkflow'
+import apiKeysService from '@/services/apiKeys'
 
 const route = useRoute()
 
@@ -161,9 +163,32 @@ const showShotDialog = ref(false)
 const showKeyframeDialog = ref(false)
 const showTransitionDialog = ref(false)
 
+// API Keys
+const apiKeys = ref([])
+
+const loadApiKeys = async () => {
+  try {
+    const response = await apiKeysService.getAPIKeys()
+    apiKeys.value = response.api_keys || []
+  } catch (error) {
+    console.error('Failed to load API keys:', error)
+  }
+}
+
 // Event handlers
-const handleExtractCharacters = async (scriptId, apiKeyId, model) => {
-  await characterWorkflow.extractCharacters(scriptId, apiKeyId, model)
+const handleStepChange = (step) => {
+  // 允许用户手动切换步骤，支持回退操作
+  currentStep.value = step
+}
+
+const handleExtractCharacters = async (apiKeyId, model) => {
+  // 需要script ID，但当前逻辑是从章节提取
+  // TODO: 修改后端API为 POST /movie/chapters/{chapterId}/extract-characters
+  if (!sceneWorkflow.script.value) {
+    ElMessage.warning('请先提取场景，才能提取角色')
+    return
+  }
+  await characterWorkflow.extractCharacters(sceneWorkflow.script.value.id, apiKeyId, model)
   await loadData()
 }
 

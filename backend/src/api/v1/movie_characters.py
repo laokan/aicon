@@ -34,7 +34,7 @@ async def extract_characters(
     task = movie_extract_characters.delay(script_id, req.api_key_id, req.model)
     return {"task_id": task.id, "message": "角色提取任务已提交"}
 
-@router.get("/projects/{project_id}/characters", response_model=List[MovieCharacterBase])
+@router.get("/projects/{project_id}/characters")
 async def list_characters(
     project_id: str, 
     db: AsyncSession = Depends(get_db),
@@ -42,9 +42,16 @@ async def list_characters(
 ):
     """列出项目下的所有电影角色"""
     from src.services.movie import MovieService
+    from src.api.schemas.movie import MovieCharacterBase
+    
     movie_service = MovieService(db)
     chars = await movie_service.list_characters(project_id)
-    return chars
+    
+    # 使用schema的from_orm_with_signed_urls方法
+    result = [MovieCharacterBase.from_orm_with_signed_urls(char) for char in chars]
+    
+    # 返回统一格式：{ characters: [...] }
+    return {"characters": [r.model_dump() for r in result]}
 
 @router.put("/characters/{character_id}", response_model=MovieCharacterBase)
 async def update_character(

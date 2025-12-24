@@ -76,24 +76,45 @@ class MovieCharacterBase(BaseModel):
         if v is None:
             return []
         return v
-
-    @field_validator("avatar_url", mode="after")
+    
+    @field_validator("reference_images", mode="before")
     @classmethod
-    def sign_avatar_url(cls, v: Optional[str]) -> Optional[str]:
-        if v and not v.startswith("http"):
-            return storage_client.get_presigned_url(v, timedelta(hours=24))
+    def ensure_reference_images_list(cls, v):
+        """确保reference_images是列表"""
+        if v is None:
+            return []
         return v
-
-    @field_validator("reference_images", mode="after")
+    
     @classmethod
-    def sign_reference_images(cls, v: List[str]) -> List[str]:
-        if not v:
-            return v
-        return [
-            storage_client.get_presigned_url(img, timedelta(hours=24))
-            if img and not img.startswith("http") else img
-            for img in v
-        ]
+    def from_orm_with_signed_urls(cls, obj):
+        """从ORM对象创建，并签名URL"""
+        from src.utils.storage import storage_client
+        from datetime import timedelta
+        
+        # 先转换为字典
+        data = {
+            "id": obj.id,
+            "name": obj.name,
+            "role_description": obj.role_description,
+            "visual_traits": obj.visual_traits,
+            "dialogue_traits": obj.dialogue_traits,
+            "era_background": obj.era_background,
+            "occupation": obj.occupation,
+            "key_visual_traits": obj.key_visual_traits or [],
+            "generated_prompt": obj.generated_prompt,
+            "avatar_url": (
+                storage_client.get_presigned_url(obj.avatar_url, timedelta(hours=24))
+                if obj.avatar_url and not obj.avatar_url.startswith("http")
+                else obj.avatar_url
+            ),
+            "reference_images": [
+                storage_client.get_presigned_url(img, timedelta(hours=24))
+                if img and not img.startswith("http")
+                else img
+                for img in (obj.reference_images or [])
+            ]
+        }
+        return cls(**data)
 
 class CharacterExtractRequest(BaseModel):
     api_key_id: str

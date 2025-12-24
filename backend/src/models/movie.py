@@ -135,3 +135,42 @@ class MovieCharacter(BaseModel):
             characters.append(char)
         await db_session.flush()
         return characters
+    
+    def to_dict(self, sign_urls: bool = True):
+        """转换为字典，可选择是否签名URL"""
+        from src.utils.storage import storage_client
+        from datetime import timedelta
+        
+        data = {
+            "id": str(self.id),
+            "project_id": str(self.project_id),
+            "name": self.name,
+            "role_description": self.role_description,
+            "visual_traits": self.visual_traits,
+            "dialogue_traits": self.dialogue_traits,
+            "era_background": self.era_background,
+            "occupation": self.occupation,
+            "key_visual_traits": self.key_visual_traits or [],
+            "generated_prompt": self.generated_prompt,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at
+        }
+        
+        # 处理URL签名
+        if sign_urls:
+            data["avatar_url"] = (
+                storage_client.get_presigned_url(self.avatar_url, timedelta(hours=24))
+                if self.avatar_url and not self.avatar_url.startswith("http")
+                else self.avatar_url
+            )
+            data["reference_images"] = [
+                storage_client.get_presigned_url(img, timedelta(hours=24))
+                if img and not img.startswith("http")
+                else img
+                for img in (self.reference_images or [])
+            ]
+        else:
+            data["avatar_url"] = self.avatar_url
+            data["reference_images"] = self.reference_images or []
+        
+        return data
