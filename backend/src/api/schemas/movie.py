@@ -155,6 +155,7 @@ class CharacterGenerateRequest(BaseModel):
 class KeyframeGenerateRequest(BaseModel):
     api_key_id: str
     model: Optional[str] = None
+    prompt: Optional[str] = None  # 自定义提示词
 
 class BatchGenerateAvatarsRequest(BaseModel):
     api_key_id: str

@@ -77,6 +77,13 @@ export const movieService = {
     // ==================== 关键帧管理 ====================
 
     /**
+     * 为单个分镜生成关键帧
+     */
+    generateSingleKeyframe(shotId, data) {
+        return post(`/movie/shots/${shotId}/generate-keyframe`, data)
+    },
+
+    /**
      * 为剧本批量生成分镜关键帧
      */
     generateKeyframes(scriptId, data) {

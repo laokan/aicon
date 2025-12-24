@@ -114,6 +114,23 @@ async def movie_generate_keyframes(db_session: AsyncSession, self, script_id: st
     logger.info(f"Celery任务完成: movie_generate_keyframes")
     return stats
 
+@celery_app.task(
+    bind=True,
+    max_retries=0,
+    name="movie.generate_single_keyframe"
+)
+@async_task_decorator
+async def movie_generate_single_keyframe(db_session: AsyncSession, self, shot_id: str, api_key_id: str, model: str = None, prompt: str = None):
+    """生成单个分镜关键帧的 Celery 任务"""
+    from src.services.visual_identity_service import VisualIdentityService
+    logger.info(f"Celery任务开始: movie_generate_single_keyframe (shot_id={shot_id})")
+    
+    service = VisualIdentityService(db_session)
+    url = await service.generate_single_keyframe(shot_id, api_key_id, model, prompt)
+    
+    logger.info(f"Celery任务完成: movie_generate_single_keyframe")
+    return {"keyframe_url": url}
+
 # Removed: movie_batch_produce_shots - obsolete, replaced by transition workflow
 
 # Removed: movie_regenerate_keyframe - obsolete, shots now only have single keyframe

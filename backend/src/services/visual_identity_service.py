@@ -25,74 +25,6 @@ logger = get_logger(__name__)
 # 辅助函数
 # ============================================================
 
-def _normalize_character_name(name: str) -> str:
-    """标准化角色名称,移除括号内容"""
-    import re
-    return re.sub(r'\s*\([^)]*\)', '', name).strip()
-
-
-def _character_appears_in_shot(char_name: str, shot: MovieShot) -> bool:
-    """
-    智能判断角色是否出现在镜头中
-    使用多种策略:
-    1. 完整名称匹配
-    2. 标准化名称匹配(移除括号)
-    3. 名字部分匹配(中文名或英文名)
-    """
-    import re
-    
-    # 合并镜头描述和对白
-    full_text = f"{shot.shot or ''} {shot.dialogue or ''}"
-    
-    # 策略1: 完整名称匹配
-    if char_name in full_text:
-        return True
-    
-    # 策略2: 标准化名称匹配
-    normalized_char = _normalize_character_name(char_name)
-    if normalized_char and normalized_char in full_text:
-        return True
-    
-    # 策略3: 提取括号内的英文名或中文名分别匹配
-    # 例如 "阿尔德里克 (Aldric)" -> ["阿尔德里克", "Aldric"]
-    parts = re.findall(r'([^\(\)]+)', char_name)
-    for part in parts:
-        part = part.strip()
-        if part and len(part) > 1 and part in full_text:
-            return True
-    
-    return False
-
-
-def _collect_character_references(chars: List[MovieCharacter], shot: MovieShot, max_refs: int = 3) -> List[str]:
-    """
-    收集镜头中出现角色的参考图
-    
-    Args:
-        chars: 所有角色列表
-        shot: 镜头对象
-        max_refs: 最大参考图数量
-        
-    Returns:
-        参考图URL列表(去重)
-    """
-    ref_images = []
-    matched_chars = []
-    
-    for char in chars:
-        if _character_appears_in_shot(char.name, shot):
-            matched_chars.append(char.name)
-            if char.avatar_url:
-                ref_images.append(char.avatar_url)
-    
-    # 去重并限制数量
-    ref_images = list(dict.fromkeys(ref_images))[:max_refs]
-    
-    if matched_chars:
-        logger.info(f"分镜 {str(shot.id)[:8]} 匹配到角色: {matched_chars}, 参考图数量: {len(ref_images)}")
-    
-    return ref_images
-
 # ============================================================
 # 独立 Worker 函数 (参照 image.py 规范)
 # ============================================================
@@ -103,13 +35,11 @@ async def _generate_keyframe_worker(
     user_id: Any,
     api_key,
     model: Optional[str],
-    semaphore: asyncio.Semaphore,
-    storage_client,
-    ref_images: List[str] = None
+    semaphore: asyncio.Semaphore
 ):
     """
     单个分镜关键帧生成的 Worker - 负责生成、下载、上传，不负责 Commit
-    包含角色参考图以确保人物一致性
+    角色信息直接从shot.characters字段获取
     
     注意：新架构下，每个分镜只有一个关键帧（keyframe_url）
     """
@@ -128,20 +58,16 @@ async def _generate_keyframe_worker(
                 if char.name in shot_characters:
                     character_context += f" Character {char.name}: {char.visual_traits}."
 
-            # 如果有角色参考图，强调一致性
-            if ref_images:
-                character_context += " IMPORTANT: Maintain strict visual consistency with the provided character reference images. Ensure same face, clothing, and body type."
-
             final_prompt = f"{base_prompt}. {character_context}. Cinematic movie still, 8k, highly detailed, photorealistic, dramatic lighting."
             
-            # 2. Provider 调用 (包含参考图)
+            # 2. Provider 调用
             img_provider = ProviderFactory.create(
                 provider=api_key.provider,
                 api_key=api_key.get_api_key(),
                 base_url=api_key.base_url
             )
 
-            logger.info(f"生成分镜 {shot.id} 关键帧, Prompt: {final_prompt[:100]}..., Refs: {len(ref_images or [])}")
+            logger.info(f"生成分镜 {shot.id} 关键帧, Prompt: {final_prompt[:100]}...")
             
             # 准备生成参数
             gen_params = {
@@ -149,43 +75,21 @@ async def _generate_keyframe_worker(
                 "model": model
             }
             
-            if ref_images:
-                gen_params["reference_images"] = ref_images
-            
             # 某些 provider 支持参考图 (如 SiliconFlow)        
             result = await retry_with_backoff(
                 lambda: img_provider.generate_image(**gen_params)
             )
             
-            image_data = result.data[0]
+            # 3. 提取并上传图片（使用通用工具函数）
+            from src.utils.image_utils import extract_and_upload_image
             
-            # 3. 获取图片内容 (URL 或 Base64)
-            if image_data.b64_json:
-                content = base64.b64decode(image_data.b64_json)
-            elif image_data.url:
-                async with aiohttp.ClientSession() as http_session:
-                    async with http_session.get(image_data.url) as resp:
-                        if resp.status != 200:
-                            raise Exception(f"下载图片失败: {resp.status}")
-                        content = await resp.read()
-            else:
-                raise Exception("Provider 返回了空的图片数据")
-
-            # 4. 上传存储
-            file_id = str(uuid.uuid4())
-            upload_file = UploadFile(
-                filename=f"{file_id}_keyframe.jpg",
-                file=io.BytesIO(content),
-            )
-            
-            storage_result = await storage_client.upload_file(
+            object_key = await extract_and_upload_image(
+                result=result,
                 user_id=str(user_id),
-                file=upload_file,
                 metadata={"shot_id": str(shot.id), "type": "keyframe"}
             )
-            object_key = storage_result["object_key"]
 
-            # 5. 更新对象属性 (不 Commit) - 使用新的keyframe_url字段
+            # 4. 更新对象属性 (不 Commit) - 使用新的keyframe_url字段
             shot.keyframe_url = object_key
                 
             logger.info(f"关键帧生成并存储完成: shot_id={shot.id}, key={object_key}")
@@ -316,19 +220,17 @@ class VisualIdentityService(BaseService):
         # 3. 准备资源
         api_key_service = APIKeyService(self.db_session)
         api_key = await api_key_service.get_api_key_by_id(api_key_id, str(user_id))
-        storage_client = await get_storage_client()
 
         # 4. 筛选待处理任务 - 只生成缺少keyframe的分镜
         tasks = []
-        semaphore = asyncio.Semaphore(5)
+        semaphore = asyncio.Semaphore(20)
         
         for scene in script.scenes:
             for shot in scene.shots:
                 # 检查是否需要生成关键帧
                 if not shot.keyframe_url:
-                    ref_images = _collect_character_references(chars, shot)
                     tasks.append(
-                        _generate_keyframe_worker(shot, chars, user_id, api_key, model, semaphore, storage_client, ref_images)
+                        _generate_keyframe_worker(shot, chars, user_id, api_key, model, semaphore)
                     )
         
         # 5. 无任务则返回
@@ -352,6 +254,90 @@ class VisualIdentityService(BaseService):
             "failed": failed_count,
             "message": f"批量生成完成: 成功 {success_count}, 失败 {failed_count}"
         }
+
+    async def generate_single_keyframe(self, shot_id: str, api_key_id: str, model: str = None, prompt: str = None):
+        """
+        生成单个分镜的关键帧
+        
+        Args:
+            shot_id: 分镜 ID
+            api_key_id: API Key ID
+            model: 图像模型
+            prompt: 自定义提示词（可选）
+            
+        Returns:
+            str: 关键帧图片 URL
+        """
+        from src.models.movie import MovieShot, MovieScene, MovieScript
+        from src.models.chapter import Chapter
+        from src.models.project import Project
+        from src.services.api_key import APIKeyService
+        from src.services.provider.factory import ProviderFactory
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload, joinedload
+        
+        # 1. 获取分镜（预加载关系）
+        stmt = (
+            select(MovieShot)
+            .where(MovieShot.id == shot_id)
+            .options(
+                joinedload(MovieShot.scene)
+                .joinedload(MovieScene.script)
+                .joinedload(MovieScript.chapter)
+                .joinedload(Chapter.project)
+            )
+        )
+        result = await self.db_session.execute(stmt)
+        shot = result.scalar_one_or_none()
+        
+        if not shot:
+            raise ValueError(f"分镜不存在: {shot_id}")
+        
+        # 获取user_id
+        user_id = str(shot.scene.script.chapter.project.owner_id)
+        
+        # 2. 获取 API Key  
+        api_key_service = APIKeyService(self.db_session)
+        api_key = await api_key_service.get_api_key_by_id(api_key_id)
+        
+        if not api_key:
+            raise ValueError(f"API Key 不存在: {api_key_id}")
+        
+        # 3. 创建提供商
+        provider = ProviderFactory.create(
+            provider=api_key.provider,
+            api_key=api_key.get_api_key(),
+            base_url=api_key.base_url
+        )
+        
+        # 4. 生成图像提示词（如果没有自定义）
+        if not prompt:
+            prompt = shot.shot
+        
+        # 5. 生成图像
+        logger.info(f"开始生成关键帧: shot_id={shot_id}, model={model}")
+        result = await provider.generate_image(
+            prompt=prompt,
+            model=model
+        )
+        
+        # 6. 提取并上传图片（使用通用工具函数，支持base64格式）
+        from src.utils.image_utils import extract_and_upload_image
+        
+        object_key = await extract_and_upload_image(
+            result=result,
+            user_id=user_id,
+            metadata={"shot_id": str(shot_id)}
+        )
+        
+        logger.info(f"图片已上传到存储: {object_key}")
+        
+        # 7. 更新分镜
+        shot.keyframe_url = object_key
+        await self.db_session.commit()
+        
+        logger.info(f"关键帧生成完成: shot_id={shot_id}")
+        return object_key
 
 __all__ = ["VisualIdentityService"]
 

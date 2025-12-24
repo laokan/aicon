@@ -58,7 +58,7 @@
           <!-- 步骤2: 分镜提取 -->
           <ShotPanel
             v-show="currentStep === 2"
-            :shots="shotWorkflow.allShots.value"
+            :scene-groups="shotWorkflow.sceneGroups.value"
             :extracting="shotWorkflow.extracting.value"
             :can-extract="canExtractShots"
             :api-keys="apiKeys"
@@ -68,11 +68,12 @@
           <!-- 步骤3: 关键帧生成 -->
           <KeyframePanel
             v-show="currentStep === 3"
-            :shots="shotWorkflow.allShots.value"
-            :generating="shotWorkflow.generatingKeyframes.value"
+            :scene-groups="shotWorkflow.sceneGroups.value"
             :can-generate="canGenerateKeyframes"
             :api-keys="apiKeys"
-            @generate-keyframes="handleGenerateKeyframes"
+            :generating-ids="shotWorkflow.generatingKeyframes.value"
+            @batch-generate="handleBatchGenerateKeyframes"
+            @generate-keyframe="handleGenerateSingleKeyframe"
           />
 
           <!-- 步骤4: 过渡视频 -->
@@ -209,13 +210,18 @@ const handleExtractShots = async (apiKeyId, model) => {
   await loadData(true)  // skipStepUpdate=true 保持当前步骤
 }
 
-const handleGenerateKeyframes = async (apiKeyId, model) => {
+const handleBatchGenerateKeyframes = async (apiKeyId, model) => {
   if (!sceneWorkflow.script.value?.id) {
     ElMessage.warning('请先提取场景')
     return
   }
   await shotWorkflow.generateKeyframes(sceneWorkflow.script.value.id, apiKeyId, model)
-  await loadData(true)  // skipStepUpdate=true 保持当前步骤
+  await loadData(true)
+}
+
+const handleGenerateSingleKeyframe = async (shotId, apiKeyId, model, prompt) => {
+  await shotWorkflow.generateSingleKeyframe(shotId, apiKeyId, model, prompt)
+  await loadData(true)
 }
 
 const handleCreateTransitions = async (apiKeyId, model) => {
@@ -306,5 +312,16 @@ watch(projectId, (newId) => {
 
 .final-step {
   padding: 60px 0;
+}
+
+.info-panel {
+  background: white;
+  border-radius: 8px;
+  padding: 40px 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
 }
 </style>

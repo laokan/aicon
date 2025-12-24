@@ -111,13 +111,13 @@ class APIKeyService(BaseService):
         logger.debug(f"获取用户API密钥列表: 用户={user_id}, 总数={total}, 页={page}")
         return list(api_keys), total
 
-    async def get_api_key_by_id(self, key_id: str, user_id: str) -> APIKey:
+    async def get_api_key_by_id(self, key_id: str, user_id: Optional[str] = None) -> APIKey:
         """
         根据ID获取API密钥
         
         Args:
             key_id: 密钥ID
-            user_id: 用户ID
+            user_id: 用户ID（可选，如果不提供则不过滤用户）
             
         Returns:
             API密钥对象
@@ -125,7 +125,13 @@ class APIKeyService(BaseService):
         Raises:
             HTTPException: 密钥不存在或无权访问
         """
-        api_key = await APIKey.get_by_id_and_user(self.db_session, key_id, user_id)
+        if user_id:
+            api_key = await APIKey.get_by_id_and_user(self.db_session, key_id, user_id)
+        else:
+            # 不过滤用户，直接通过ID查询
+            stmt = select(APIKey).where(APIKey.id == key_id)
+            result = await self.db_session.execute(stmt)
+            api_key = result.scalar_one_or_none()
 
         if not api_key:
             raise NotFoundError("未找到到APIKEY", resource_id=key_id, resource_type="api_key")

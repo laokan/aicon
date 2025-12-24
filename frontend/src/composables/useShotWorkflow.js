@@ -9,13 +9,22 @@ import { useTaskPoller } from './useTaskPoller'
  */
 export function useShotWorkflow(script) {
     const extracting = ref(false)
-    const generatingKeyframes = ref(false)
+    const generatingKeyframes = ref(new Set()) // 使用Set跟踪多个并发生成
 
     const allShots = computed(() => {
         if (!script.value?.scenes) return []
         return script.value.scenes.flatMap(scene =>
             scene.shots.map(shot => ({ ...shot, scene_id: scene.id }))
         ).sort((a, b) => a.order_index - b.order_index)
+    })
+
+    // 按场景分组的分镜数据
+    const sceneGroups = computed(() => {
+        if (!script.value?.scenes) return []
+        return script.value.scenes.map(scene => ({
+            scene,
+            shots: scene.shots || []
+        })).filter(group => group.shots.length > 0)
     })
 
     const extractShots = async (scriptId, apiKeyId, model) => {
@@ -46,7 +55,6 @@ export function useShotWorkflow(script) {
     }
 
     const generateKeyframes = async (scriptId, apiKeyId, model) => {
-        generatingKeyframes.value = true
         try {
             const response = await movieService.generateKeyframes(scriptId, {
                 api_key_id: apiKeyId,
@@ -62,24 +70,57 @@ export function useShotWorkflow(script) {
                     } else {
                         ElMessage.success(`关键帧生成完成: 共 ${result.success} 个分镜`)
                     }
-                    generatingKeyframes.value = false
                     window.location.reload() // Temporary solution
                 }, (error) => {
                     ElMessage.error(`生成失败: ${error.message}`)
-                    generatingKeyframes.value = false
                 })
             }
         } catch (error) {
             ElMessage.error('关键帧生成失败')
-            generatingKeyframes.value = false
+        }
+    }
+
+    const generateSingleKeyframe = async (shotId, apiKeyId, model, prompt) => {
+        generatingKeyframes.value.add(shotId)
+        try {
+            const response = await movieService.generateSingleKeyframe(shotId, {
+                api_key_id: apiKeyId,
+                model,
+                prompt
+            })
+
+            if (response.task_id) {
+                ElMessage.success('关键帧生成任务已提交')
+                const { startPolling } = useTaskPoller()
+                startPolling(response.task_id,
+                    // Success callback
+                    async () => {
+                        ElMessage.success('关键帧生成完成')
+                        generatingKeyframes.value.delete(shotId)
+                        window.location.reload()
+                    },
+                    // Error callback
+                    (error) => {
+                        ElMessage.error(`生成失败: ${error.message}`)
+                        generatingKeyframes.value.delete(shotId)
+                    }
+                )
+            } else {
+                generatingKeyframes.value.delete(shotId)
+            }
+        } catch (error) {
+            ElMessage.error('关键帧生成失败')
+            generatingKeyframes.value.delete(shotId)
         }
     }
 
     return {
         allShots,
+        sceneGroups,
         extracting,
         generatingKeyframes,
         extractShots,
-        generateKeyframes
+        generateKeyframes,
+        generateSingleKeyframe
     }
 }

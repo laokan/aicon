@@ -15,29 +15,73 @@
     </div>
 
     <div class="shot-list">
-      <el-empty v-if="shots.length === 0" description="暂无分镜，请先提取分镜" />
+      <el-empty v-if="sceneGroups.length === 0" description="暂无分镜，请先提取分镜" />
       
-      <div v-else class="shot-grid">
-        <div 
-          v-for="shot in shots" 
-          :key="shot.id"
-          class="shot-card"
+      <!-- 按场景分组的折叠面板 -->
+      <el-collapse v-else v-model="activeScenes" class="scene-collapse">
+        <el-collapse-item 
+          v-for="group in sceneGroups" 
+          :key="group.scene.id"
+          :name="group.scene.id"
         >
-          <div class="shot-header">
-            <span class="shot-number">镜头 {{ shot.order_index }}</span>
-            <el-tag v-if="shot.keyframe_url" type="success" size="small">已生成关键帧</el-tag>
-          </div>
+          <template #title>
+            <div class="scene-header">
+              <div class="scene-title-row">
+                <span class="scene-number">场景 {{ group.scene.order_index }}</span>
+                <el-tag size="small" type="info">{{ group.shots.length }} 个分镜</el-tag>
+              </div>
+              <div class="scene-characters" v-if="group.scene.characters && group.scene.characters.length > 0">
+                <el-tag 
+                  v-for="char in group.scene.characters" 
+                  :key="char"
+                  size="small"
+                  effect="plain"
+                  style="margin-right: 4px"
+                >
+                  {{ char }}
+                </el-tag>
+              </div>
+            </div>
+          </template>
           
-          <div class="shot-content">
-            <p class="shot-description">{{ shot.shot }}</p>
-            <p v-if="shot.dialogue" class="shot-dialogue">💬 {{ shot.dialogue }}</p>
+          <!-- 场景描述 -->
+          <div class="scene-description">
+            <p>{{ group.scene.scene }}</p>
           </div>
 
-          <div v-if="shot.keyframe_url" class="shot-keyframe">
-            <img :src="shot.keyframe_url" alt="关键帧" />
+          <!-- 该场景的分镜列表 -->
+          <div class="shot-grid">
+            <div 
+              v-for="shot in group.shots" 
+              :key="shot.id"
+              class="shot-card"
+            >
+              <div class="shot-header">
+                <span class="shot-number">镜头 {{ shot.order_index }}</span>
+                <el-tag v-if="shot.keyframe_url" type="success" size="small">已生成关键帧</el-tag>
+              </div>
+              
+              <div class="shot-content">
+                <p class="shot-description">{{ shot.shot }}</p>
+                <p v-if="shot.dialogue" class="shot-dialogue">💬 {{ shot.dialogue }}</p>
+                
+                <!-- 显示分镜中的角色 -->
+                <div v-if="shot.characters && shot.characters.length > 0" class="shot-characters">
+                  <el-tag 
+                    v-for="char in shot.characters" 
+                    :key="char"
+                    size="small"
+                    type="warning"
+                    effect="plain"
+                  >
+                    {{ char }}
+                  </el-tag>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </el-collapse-item>
+      </el-collapse>
     </div>
 
     <!-- API Key选择对话框 -->
@@ -90,7 +134,7 @@ import { ElMessage } from 'element-plus'
 import api from '@/services/api'
 
 const props = defineProps({
-  shots: {
+  sceneGroups: {
     type: Array,
     default: () => []
   },
@@ -110,6 +154,7 @@ const props = defineProps({
 
 const emit = defineEmits(['extract-shots'])
 
+const activeScenes = ref([])
 const showDialog = ref(false)
 const formData = ref({
   apiKeyId: '',
@@ -185,10 +230,55 @@ const handleDialogConfirm = () => {
   font-weight: 600;
 }
 
+.scene-collapse {
+  border: none;
+}
+
+.scene-header {
+  flex: 1;
+  padding-right: 20px;
+}
+
+.scene-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.scene-number {
+  font-weight: 600;
+  font-size: 16px;
+  color: #409eff;
+}
+
+.scene-characters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.scene-description {
+  background: #f5f7fa;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border-left: 3px solid #409eff;
+}
+
+.scene-description p {
+  margin: 0;
+  line-height: 1.6;
+  color: #606266;
+  white-space: pre-wrap;
+}
+
 .shot-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
+  margin-top: 16px;
 }
 
 .shot-card {
@@ -196,6 +286,7 @@ const handleDialogConfirm = () => {
   border-radius: 8px;
   padding: 16px;
   transition: all 0.3s;
+  background: white;
 }
 
 .shot-card:hover {
@@ -212,7 +303,8 @@ const handleDialogConfirm = () => {
 
 .shot-number {
   font-weight: 600;
-  color: #409eff;
+  color: #67c23a;
+  font-size: 14px;
 }
 
 .shot-content {
@@ -227,21 +319,41 @@ const handleDialogConfirm = () => {
 }
 
 .shot-dialogue {
-  margin: 0;
+  margin: 8px 0;
   font-size: 13px;
   color: #909399;
   font-style: italic;
-}
-
-.shot-keyframe {
-  margin-top: 12px;
+  padding: 8px;
+  background: #f0f9ff;
   border-radius: 4px;
-  overflow: hidden;
 }
 
-.shot-keyframe img {
-  width: 100%;
-  height: auto;
-  display: block;
+.shot-characters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+/* 折叠面板样式优化 */
+:deep(.el-collapse-item__header) {
+  background: #fafafa;
+  padding: 16px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+:deep(.el-collapse-item__header:hover) {
+  background: #f0f2f5;
+}
+
+:deep(.el-collapse-item__wrap) {
+  border: none;
+  background: transparent;
+}
+
+:deep(.el-collapse-item__content) {
+  padding: 0 16px 16px;
 }
 </style>

@@ -37,3 +37,15 @@ async def generate_keyframes(
     from src.tasks.movie import movie_generate_keyframes
     task = movie_generate_keyframes.delay(script_id, req.api_key_id, req.model)
     return {"task_id": task.id, "message": "分镜关键帧生成任务已提交"}
+
+@router.post("/shots/{shot_id}/generate-keyframe", summary="生成单个分镜关键帧")
+async def generate_single_keyframe(
+    shot_id: str,
+    req: KeyframeGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+):
+    """提交单个分镜关键帧生成任务到 Celery"""
+    from src.tasks.movie import movie_generate_single_keyframe
+    task = movie_generate_single_keyframe.delay(shot_id, req.api_key_id, req.model, req.prompt)
+    return {"task_id": task.id, "message": "关键帧生成任务已提交"}
