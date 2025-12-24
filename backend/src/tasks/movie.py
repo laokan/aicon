@@ -12,39 +12,56 @@ logger = get_logger(__name__)
 @celery_app.task(
     bind=True,
     max_retries=0,
-    name="movie.generate_script"
+    name="movie.extract_scenes"
 )
 @async_task_decorator
-async def movie_generate_script(db_session: AsyncSession, self, chapter_id: str, api_key_id: str, model: str = None):
-    """生成剧本的 Celery 任务"""
-    from src.services.script_engine import ScriptEngineService
-    logger.info(f"Celery任务开始: movie_generate_script (chapter_id={chapter_id})")
+async def movie_extract_scenes(db_session: AsyncSession, self, chapter_id: str, api_key_id: str, model: str = None):
+    """从章节提取场景的 Celery 任务"""
+    from src.services.scene_service import SceneService
+    logger.info(f"Celery任务开始: movie_extract_scenes (chapter_id={chapter_id})")
     
     async def on_progress(percent, msg):
         self.update_state(state='PROGRESS', meta={'percent': percent, 'message': msg})
         
-    service = ScriptEngineService(db_session)
-    result = await service.generate_script(chapter_id, api_key_id, model, on_progress=on_progress)
+    service = SceneService(db_session)
+    result = await service.extract_scenes_from_chapter(chapter_id, api_key_id, model, on_progress=on_progress)
     
-    logger.info(f"Celery任务完成: movie_generate_script")
+    logger.info(f"Celery任务完成: movie_extract_scenes")
     return {"script_id": str(result.id)}
 
 @celery_app.task(
     bind=True,
     max_retries=0,
-    name="movie.produce_shot"
+    name="movie.extract_shots"
 )
 @async_task_decorator
-async def movie_produce_shot(db_session: AsyncSession, self, shot_id: str, api_key_id: str, model: str = "veo_3_1-fast", force: bool = False):
-    """生产单个镜头的 Celery 任务"""
-    from src.services.movie_production import MovieProductionService
-    logger.info(f"Celery任务开始: movie_produce_shot (shot_id={shot_id}, force={force})")
+async def movie_extract_shots(db_session: AsyncSession, self, script_id: str, api_key_id: str, model: str = None):
+    """从剧本提取分镜的 Celery 任务"""
+    from src.services.storyboard_service import StoryboardService
+    logger.info(f"Celery任务开始: movie_extract_shots (script_id={script_id})")
     
-    service = MovieProductionService(db_session)
-    task_id = await service.produce_shot_video(shot_id, api_key_id, model, force=force)
+    service = StoryboardService(db_session)
+    result = await service.batch_extract_shots_from_script(script_id, api_key_id, model)
     
-    logger.info(f"Celery任务提交: Vector Engine Task ID = {task_id}")
-    return {"video_task_id": task_id}
+    logger.info(f"Celery任务完成: movie_extract_shots, 成功 {result['success']}, 失败 {result['failed']}")
+    return result
+
+@celery_app.task(
+    bind=True,
+    max_retries=0,
+    name="movie.create_transitions"
+)
+@async_task_decorator
+async def movie_create_transitions(db_session: AsyncSession, self, script_id: str, api_key_id: str, model: str = None):
+    """创建过渡视频记录的 Celery 任务"""
+    from src.services.transition_service import TransitionService
+    logger.info(f"Celery任务开始: movie_create_transitions (script_id={script_id})")
+    
+    service = TransitionService(db_session)
+    result = await service.batch_create_transitions(script_id, api_key_id, model)
+    
+    logger.info(f"Celery任务完成: movie_create_transitions, 成功 {result['success']}")
+    return result
 
 @celery_app.task(
     bind=True,

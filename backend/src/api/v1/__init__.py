@@ -35,9 +35,13 @@ from .bgms import router as bgms_router
 from .tasks import router as tasks_router
 from .video_tasks import router as video_tasks_router
 from .dashboard import router as dashboard_router
-from .bilibili import router as bilibili_router  # 新增
-from .export import router as export_router  # 导出功能
-from .movie import router as movie_router  # 电影生成功能
+from .bilibili import router as bilibili_router
+from .export import router as export_router
+# 电影生成功能 - 拆分为4个模块
+from .movie_characters import router as movie_characters_router
+from .movie_scenes import router as movie_scenes_router
+from .movie_shots import router as movie_shots_router
+from .movie_transitions import router as movie_transitions_router
 
 # 注册路由
 api_router.include_router(auth_router, prefix="/auth", tags=["认证"])
@@ -55,8 +59,12 @@ api_router.include_router(bgms_router, prefix="/bgms", tags=["BGM管理"])
 api_router.include_router(tasks_router, prefix="/tasks", tags=["任务管理"])
 api_router.include_router(video_tasks_router, prefix="/video-tasks", tags=["视频任务"])
 api_router.include_router(dashboard_router, prefix="/dashboard", tags=["仪表盘"])
-api_router.include_router(bilibili_router, prefix="/bilibili", tags=["Bilibili发布"])  # 新增
-api_router.include_router(export_router, prefix="/export", tags=["导出功能"])  # 导出功能
-api_router.include_router(movie_router, prefix="/movie", tags=["电影生成功能"])
+api_router.include_router(bilibili_router, prefix="/bilibili", tags=["Bilibili发布"])
+api_router.include_router(export_router, prefix="/export", tags=["导出功能"])
+# 电影生成功能路由
+api_router.include_router(movie_characters_router, prefix="/movie", tags=["电影-角色管理"])
+api_router.include_router(movie_scenes_router, prefix="/movie", tags=["电影-场景管理"])
+api_router.include_router(movie_shots_router, prefix="/movie", tags=["电影-分镜管理"])
+api_router.include_router(movie_transitions_router, prefix="/movie", tags=["电影-过渡视频"])
 
 __all__ = ["api_router"]

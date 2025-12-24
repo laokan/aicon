@@ -18,21 +18,13 @@ class MovieShotBase(BaseModel):
     visual_description: str
     camera_movement: Optional[str] = None
     dialogue: Optional[str] = None
-    performance_prompt: Optional[str] = None
-    first_frame_url: Optional[str] = None
-    first_frame_prompt: Optional[str] = None
-    last_frame_url: Optional[str] = None
-    last_frame_prompt: Optional[str] = None
-    video_url: Optional[str] = None
-    video_prompt: Optional[str] = None
-    api_key_id: Optional[str] = None
-    status: Optional[str] = "pending"
-    last_error: Optional[str] = None
+    characters: List[str] = []
+    keyframe_url: Optional[str] = None
     
     class Config:
         from_attributes = True
     
-    @field_validator("first_frame_url", "last_frame_url", "video_url", mode="after")
+    @field_validator("keyframe_url", mode="after")
     @classmethod
     def sign_urls(cls, v: Optional[str]) -> Optional[str]:
         if v and not v.startswith("http"):
@@ -42,10 +34,8 @@ class MovieShotBase(BaseModel):
 class MovieSceneBase(BaseModel):
     id: UUID4
     order_index: int
-    location: Optional[str] = None
-    time_of_day: Optional[str] = None
-    atmosphere: Optional[str] = None
-    description: Optional[str] = None
+    scene: str
+    characters: List[str] = []
     shots: List[MovieShotBase]
     
     class Config:
@@ -139,8 +129,17 @@ class BatchProduceRequest(BaseModel):
 # --- 更新请求 ---
 class ShotUpdateRequest(BaseModel):
     video_prompt: Optional[str] = None
-    first_frame_prompt: Optional[str] = None
-    last_frame_prompt: Optional[str] = None
     visual_description: Optional[str] = None
     dialogue: Optional[str] = None
     camera_movement: Optional[str] = None
+
+# --- 新增请求 schemas ---
+class StoryboardExtractRequest(BaseModel):
+    api_key_id: str
+    model: Optional[str] = None
+
+class TransitionGenerateRequest(BaseModel):
+    api_key_id: str
+    model: Optional[str] = None
+    video_model: Optional[str] = "veo_3_1-fast"
+
