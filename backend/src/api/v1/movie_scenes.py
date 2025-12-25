@@ -10,7 +10,7 @@ from src.core.database import get_db
 from src.core.logging import get_logger
 from src.models.user import User
 from src.api.dependencies import get_current_user_required
-from src.api.schemas.movie import MovieScriptResponse, ScriptGenerateRequest
+from src.api.schemas.movie import MovieScriptResponse, ScriptGenerateRequest, SceneImageGenerateRequest, BatchGenerateSceneImagesRequest
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -41,3 +41,49 @@ async def get_script(
     movie_service = MovieService(db)
     script = await movie_service.get_script(chapter_id)
     return script
+
+@router.post("/scripts/{script_id}/scene-images", summary="批量生成场景图")
+async def batch_generate_scene_images(
+    script_id: str,
+    req: BatchGenerateSceneImagesRequest,
+    current_user: User = Depends(get_current_user_required),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    批量生成剧本所有场景的场景图
+    场景图是无人物的环境参考图，用于后续关键帧生成时保持场景一致性
+    """
+    from src.tasks.movie import movie_generate_scene_images
+    
+    task = movie_generate_scene_images.delay(script_id, req.api_key_id, req.model)
+    return {"task_id": task.id, "message": "场景图批量生成任务已提交"}
+
+@router.post("/scenes/{scene_id}/scene-image", summary="生成单个场景图")
+async def generate_scene_image(
+    scene_id: str,
+    req: SceneImageGenerateRequest,
+    current_user: User = Depends(get_current_user_required),
+    db: AsyncSession = Depends(get_db)
+):
+    """生成单个场景的场景图"""
+    from src.tasks.movie import movie_generate_single_scene_image
+    
+    task = movie_generate_single_scene_image.delay(
+        scene_id, req.api_key_id, req.model, req.prompt
+    )
+    return {"task_id": task.id, "message": "场景图生成任务已提交"}
+
+@router.post("/scenes/{scene_id}/regenerate-scene-image", summary="重新生成场景图")
+async def regenerate_scene_image(
+    scene_id: str,
+    req: SceneImageGenerateRequest,
+    current_user: User = Depends(get_current_user_required),
+    db: AsyncSession = Depends(get_db)
+):
+    """重新生成场景图（覆盖现有场景图）"""
+    from src.tasks.movie import movie_generate_single_scene_image
+    
+    task = movie_generate_single_scene_image.delay(
+        scene_id, req.api_key_id, req.model, req.prompt
+    )
+    return {"task_id": task.id, "message": "场景图重新生成任务已提交"}

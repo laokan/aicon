@@ -169,13 +169,32 @@ Shot 描述应接近"分镜脚本 + 文学描写"的融合，但始终以 **镜�
 ## 【分镜拆分原则】
 
 1. 一个 Shot 对应一个明确的镜头角度和时间段
-2. 当镜头角度、景别、或人物动作发生明显变化时，应拆分为新的 Shot
+2. 当镜头角度、景别、或人物动作发生明显变化时,应拆分为新的 Shot
 3. 对话密集的段落可以按对话轮次拆分
 4. 动作密集或冲突激烈的段落应拆分得更细，以便捕捉关键动作
 5. 保持电影叙事节奏，避免整个场景只有一个 Shot
 6. 每个 Shot 应该是一个可以独立成像的画面
-7. 绝对要保证分镜的连贯性和流畅度,开头有上一个Shot的镜头衔接，结尾有下一个Shot的镜头衔接！
-8. 分镜的切换要自然，不要突然跳转！
+7. 保证分镜连贯性，镜头切换要自然流畅
+
+## 【分镜连贯性示例】
+
+✅ 正确示例（流畅衔接）：
+Shot 1: 全景 - 夜晚的城堡大厅，壁炉火光摇曳，长桌上摆满食物
+Shot 2: 中景 - 阿尔德里克推门而入，雪花从外面飘进大厅
+Shot 3: 特写 - 阿尔德里克疲惫的脸庞，眼神扫视大厅
+
+❌ 错误示例（突兀跳转）：
+Shot 1: 特写 - 阿尔德里克的眼睛
+Shot 2: 全景 - 城外的森林
+Shot 3: 特写 - 梅露希亚的手
+
+## 【对话场景示例】
+
+场景：两人对峙
+Shot 1: 中景 - 阿尔德里克站在门口，握紧剑柄
+Shot 2: 中景 - 梅露希亚转身面对他，手按在腰间匕首上
+Shot 3: 特写 - 阿尔德里克开口："我以为你已经离开了。"
+Shot 4: 特写 - 梅露希亚冷笑："你希望我离开？"
 
 ---
 
@@ -196,6 +215,37 @@ Shot 描述应接近"分镜脚本 + 文学描写"的融合，但始终以 **镜�
             str: 格式化后的prompt
         """
         return cls.SHOT_EXTRACTION.format(characters=characters, scene=scene)
+
+    # 场景图生成Prompt
+    SCENE_IMAGE_GENERATION = """Create a cinematic environment shot for the following scene. 
+Focus ONLY on the location, setting, and atmosphere. 
+DO NOT include any people, characters, or human figures.
+
+Scene Description:
+{scene_description}
+
+Requirements:
+- High-quality cinematic photography
+- Professional lighting and composition
+- Detailed environment and atmosphere
+- NO people, NO characters, NO humans
+- Wide or establishing shot perspective
+- Film-grade visual quality
+
+Negative Prompt: people, characters, humans, person, man, woman, child, face, body"""
+
+    @classmethod
+    def get_scene_image_prompt(cls, scene_description: str) -> str:
+        """
+        获取场景图生成Prompt
+        
+        Args:
+            scene_description: 场景描述
+            
+        Returns:
+            str: 格式化后的prompt
+        """
+        return cls.SCENE_IMAGE_GENERATION.format(scene_description=scene_description)
 
     # 过渡视频提示词生成Prompt
     TRANSITION_VIDEO = """你是一个专业的视频生成提示词专家。

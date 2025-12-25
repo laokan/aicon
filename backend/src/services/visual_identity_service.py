@@ -217,11 +217,19 @@ class VisualIdentityService(BaseService):
         stmt_chars = select(MovieCharacter).where(MovieCharacter.project_id == project_id)
         chars = (await self.db_session.execute(stmt_chars)).scalars().all()
 
-        # 3. 准备资源
+        # 3. 检查所有场景是否都有场景图
+        scenes_without_image = [scene for scene in script.scenes if not scene.scene_image_url]
+        if scenes_without_image:
+            scene_numbers = [scene.order_index for scene in scenes_without_image]
+            raise ValueError(
+                f"以下场景尚未生成场景图，请先生成场景图: {', '.join(map(str, scene_numbers))}"
+            )
+
+        # 4. 准备资源
         api_key_service = APIKeyService(self.db_session)
         api_key = await api_key_service.get_api_key_by_id(api_key_id, str(user_id))
 
-        # 4. 筛选待处理任务 - 只生成缺少keyframe的分镜
+        # 5. 筛选待处理任务 - 只生成缺少keyframe的分镜
         tasks = []
         semaphore = asyncio.Semaphore(20)
         
@@ -233,7 +241,7 @@ class VisualIdentityService(BaseService):
                         _generate_keyframe_worker(shot, chars, user_id, api_key, model, semaphore)
                     )
         
-        # 5. 无任务则返回
+        # 6. 无任务则返回
         if not tasks:
             return {"total": 0, "success": 0, "failed": 0, "message": "所有分镜已有关键帧"}
 
@@ -338,8 +346,17 @@ class VisualIdentityService(BaseService):
             )
             logger.info(f"使用构建器生成的专业提示词（长度: {len(final_prompt)}字符）")
         
-        # 4.5 获取分镜中角色的参考图
+        # 4.5 获取参考图：场景图 + 角色图
         reference_images = []
+        
+        # 首先添加场景图（如果存在）
+        if shot.scene.scene_image_url:
+            reference_images.append(shot.scene.scene_image_url)
+            logger.info(f'添加场景参考图: {shot.scene.scene_image_url}')
+        else:
+            logger.warning(f'场景 {shot.scene.id} 没有场景图，建议先生成场景图以保持场景一致性')
+        
+        # 然后添加角色参考图
         if shot.characters:
             from src.models.movie import MovieCharacter
             # 获取角色对象
@@ -356,6 +373,11 @@ class VisualIdentityService(BaseService):
                 if char.avatar_url:
                     reference_images.append(char.avatar_url)
                     logger.info(f'添加角色 {char.name} 的参考图: {char.avatar_url}')
+        
+        # 如果分镜不包含人物，添加负面提示词
+        if not shot.characters or len(shot.characters) == 0:
+            final_prompt += "\n\nNegative Prompt: people, characters, humans, person, man, woman, face, body"
+            logger.info("分镜不包含人物，添加负面提示词")
         
         
         # 5. 生成图像

@@ -63,7 +63,17 @@ class MovieSceneBase(BaseModel):
     order_index: int
     scene: str
     characters: List[str] = []
+    scene_image_url: Optional[str] = None  # 场景图URL
+    scene_image_prompt: Optional[str] = None  # 场景图提示词
     shots: List['MovieShotResponse']  # 使用MovieShotResponse以包含generated_prompt
+    
+    @field_validator("scene_image_url", mode="after")
+    @classmethod
+    def sign_scene_image_url(cls, v: Optional[str]) -> Optional[str]:
+        """为scene_image_url生成预签名URL"""
+        if v and not v.startswith("http"):
+            return storage_client.get_presigned_url(v, timedelta(hours=24))
+        return v
     
     class Config:
         from_attributes = True
@@ -211,3 +221,15 @@ class TransitionResponse(BaseModel):
 class TransitionUpdateRequest(BaseModel):
     """更新过渡视频提示词"""
     video_prompt: str
+
+# --- 场景图生成相关 ---
+class SceneImageGenerateRequest(BaseModel):
+    """单个场景图生成请求"""
+    api_key_id: str
+    model: Optional[str] = None
+    prompt: Optional[str] = None  # 自定义提示词
+
+class BatchGenerateSceneImagesRequest(BaseModel):
+    """批量生成场景图请求"""
+    api_key_id: str
+    model: Optional[str] = None

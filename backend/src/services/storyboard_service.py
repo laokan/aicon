@@ -132,42 +132,129 @@ class StoryboardService(BaseService):
         Returns:
             Dict: 统计信息 {success: int, failed: int, total: int}
         """
-        # 加载剧本和场景
+        # 1. 加载剧本和所有场景（深度加载）
         script = await self.db_session.get(MovieScript, script_id, options=[
-            selectinload(MovieScript.scenes)
+            selectinload(MovieScript.scenes).selectinload(MovieScene.shots)
         ])
         if not script:
             raise ValueError(f"未找到剧本: {script_id}")
 
-        scenes = script.scenes
-        if not scenes:
+        if not script.scenes:
             return {"success": 0, "failed": 0, "total": 0}
 
-        logger.info(f"开始批量提取分镜: {len(scenes)} 个场景")
+        # 2. 在删除前先提取场景ID列表和场景描述
+        scene_data = [(str(scene.id), scene.scene) for scene in script.scenes]
+        
+        # 3. 删除所有现有分镜（会级联删除关键帧）
+        logger.info(f"开始删除现有分镜...")
+        for scene in script.scenes:
+            if scene.shots:
+                for shot in scene.shots:
+                    await self.db_session.delete(shot)
+            # 同时清空场景图
+            scene.scene_image_url = None
+            scene.scene_image_prompt = None
+        
+        await self.db_session.commit()
+        logger.info(f"已删除所有现有分镜和场景图")
+        
+        # 4. 获取项目角色列表（所有场景共用）
+        from src.models.chapter import Chapter
+        chapter = await self.db_session.get(Chapter, script.chapter_id, options=[
+            selectinload(Chapter.project)
+        ])
+        
+        stmt = select(MovieCharacter).where(MovieCharacter.project_id == chapter.project_id)
+        result = await self.db_session.execute(stmt)
+        characters = result.scalars().all()
+        character_list = [char.name for char in characters]
+        
+        # 5. 获取API Key
+        api_key_service = APIKeyService(self.db_session)
+        api_key = await api_key_service.get_api_key_by_id(api_key_id, str(chapter.project.owner_id))
+        
+        logger.info(f"开始批量提取分镜: {len(scene_data)} 个场景")
 
+        # 6. 使用信号量控制并发
         semaphore = asyncio.Semaphore(max_concurrent)
         
-        async def process_scene(scene: MovieScene):
+        # Worker函数 - 每个worker独立处理一个场景，不需要数据库查询
+        async def _extract_shot_worker(scene_id: str, scene_description: str):
             async with semaphore:
                 try:
-                    await self.extract_shots_from_scene(str(scene.id), api_key_id, model)
-                    return {"success": True, "scene_id": str(scene.id)}
-                except Exception as e:
-                    logger.error(f"场景 {scene.id} 分镜提取失败: {e}")
-                    return {"success": False, "scene_id": str(scene.id), "error": str(e)}
+                    # 直接调用LLM生成分镜，不需要数据库查询
+                    llm_provider = ProviderFactory.create(
+                        provider=api_key.provider,
+                        api_key=api_key.get_api_key(),
+                        base_url=api_key.base_url
+                    )
 
-        tasks = [process_scene(scene) for scene in scenes]
+                    # 使用统一的Prompt模板管理器
+                    from src.services.movie_prompts import MoviePromptTemplates
+
+                    # 生成prompt
+                    prompt = MoviePromptTemplates.get_shot_extraction_prompt(
+                        characters=json.dumps(character_list, ensure_ascii=False),
+                        scene=scene_description
+                    )
+
+                    # 调用LLM
+                    response = await llm_provider.completions(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": "你是一个专业的电影分镜提取专家。只输出JSON。"},
+                            {"role": "user", "content": prompt}
+                        ],
+                        response_format={"type": "json_object"}
+                    )
+
+                    # 解析结果
+                    content = response.choices[0].message.content
+                    data = json.loads(content)
+                    shots_data = data.get("shots", [])
+                    
+                    if not shots_data:
+                        logger.warning(f"场景 {scene_id} 未提取到分镜")
+                        return {"success": False, "scene_id": scene_id, "error": "未提取到分镜"}
+
+                    logger.info(f"场景 {scene_id} 提取到 {len(shots_data)} 个分镜")
+
+                    # 创建分镜对象并添加到session
+                    for idx, shot_info in enumerate(shots_data, 1):
+                        shot = MovieShot(
+                            scene_id=scene_id,
+                            order_index=idx,
+                            shot=shot_info.get("shot", ""),
+                            dialogue=shot_info.get("dialogue", ""),
+                            characters=shot_info.get("characters", [])
+                        )
+                        self.db_session.add(shot)
+                    
+                    # 返回成功和分镜数量
+                    return {"success": True, "scene_id": scene_id, "shot_count": len(shots_data)}
+                    
+                except Exception as e:
+                    logger.error(f"场景 {scene_id} 分镜提取失败: {e}")
+                    return {"success": False, "scene_id": scene_id, "error": str(e)}
+
+        # 7. 创建并发任务
+        tasks = [_extract_shot_worker(scene_id, scene_desc) for scene_id, scene_desc in scene_data]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
+        # 8. 统计结果（shots已在worker中添加到session）
         success_count = sum(1 for r in results if isinstance(r, dict) and r.get("success"))
         failed_count = len(results) - success_count
+        
+        # 9. 一次性提交所有更改
+        if success_count > 0:
+            await self.db_session.commit()
 
         logger.info(f"批量分镜提取完成: 成功 {success_count}, 失败 {failed_count}")
 
         return {
             "success": success_count,
             "failed": failed_count,
-            "total": len(scenes),
+            "total": len(scene_data),
             "details": results
         }
 

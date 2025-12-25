@@ -156,3 +156,37 @@ async def movie_batch_generate_avatars(db_session: AsyncSession, self, project_i
     
     logger.info(f"Celery任务完成: movie_batch_generate_avatars, 成功: {result['success']}, 失败: {result['failed']}")
     return result
+
+@celery_app.task(
+    bind=True,
+    max_retries=0,
+    name="movie.generate_scene_images"
+)
+@async_task_decorator
+async def movie_generate_scene_images(db_session: AsyncSession, self, script_id: str, api_key_id: str, model: str = None):
+    """批量生成场景图的 Celery 任务"""
+    from src.services.scene_image_service import SceneImageService
+    logger.info(f"Celery任务开始: movie_generate_scene_images (script_id={script_id})")
+    
+    service = SceneImageService(db_session)
+    stats = await service.batch_generate_scene_images(script_id, api_key_id, model)
+    
+    logger.info(f"Celery任务完成: movie_generate_scene_images, 成功 {stats['success']}, 失败 {stats['failed']}")
+    return stats
+
+@celery_app.task(
+    bind=True,
+    max_retries=0,
+    name="movie.generate_single_scene_image"
+)
+@async_task_decorator
+async def movie_generate_single_scene_image(db_session: AsyncSession, self, scene_id: str, api_key_id: str, model: str = None, prompt: str = None):
+    """生成单个场景图的 Celery 任务"""
+    from src.services.scene_image_service import SceneImageService
+    logger.info(f"Celery任务开始: movie_generate_single_scene_image (scene_id={scene_id})")
+    
+    service = SceneImageService(db_session)
+    url = await service.generate_scene_image(scene_id, api_key_id, model, prompt)
+    
+    logger.info(f"Celery任务完成: movie_generate_single_scene_image")
+    return {"scene_image_url": url}

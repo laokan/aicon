@@ -38,6 +38,10 @@ class MovieScene(BaseModel):
     scene = Column(Text, nullable=False, comment="场景详细描述")
     characters = Column(JSON, default=list, comment="场景中出现的角色名称列表")
     
+    # 场景图相关字段
+    scene_image_url = Column(String(500), comment="场景图片URL（无人物的场景环境图）")
+    scene_image_prompt = Column(Text, comment="场景图生成提示词")
+    
     # 关系
     script = relationship("MovieScript", back_populates="scenes")
     shots = relationship("MovieShot", back_populates="scene", cascade="all, delete-orphan", order_by="MovieShot.order_index")
