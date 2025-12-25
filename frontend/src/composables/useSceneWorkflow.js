@@ -11,6 +11,7 @@ export function useSceneWorkflow() {
     const script = ref(null)
     const extracting = ref(false)
     const generatingSceneImages = ref(new Set())
+    const batchGenerating = ref(false) // 批量生成loading状态
 
     const loadScript = async (chapterId) => {
         if (!chapterId) return
@@ -51,6 +52,7 @@ export function useSceneWorkflow() {
     }
 
     const generateSceneImages = async (scriptId, apiKeyId, model, loadScript) => {
+        batchGenerating.value = true // 设置loading状态
         try {
             const response = await movieService.batchGenerateSceneImages(scriptId, {
                 api_key_id: apiKeyId,
@@ -62,16 +64,21 @@ export function useSceneWorkflow() {
                 const { startPolling } = useTaskPoller()
                 startPolling(response.task_id, async () => {
                     ElMessage.success('场景图批量生成完成')
+                    batchGenerating.value = false // 完成后重置
                     // 只刷新script数据，不刷新整个页面
                     if (script.value?.chapter_id && loadScript) {
                         await loadScript(script.value.chapter_id, true) // skipStepUpdate=true
                     }
                 }, (error) => {
                     ElMessage.error(`场景图生成失败: ${error.message}`)
+                    batchGenerating.value = false // 失败后重置
                 })
+            } else {
+                batchGenerating.value = false
             }
         } catch (error) {
             ElMessage.error('场景图生成失败')
+            batchGenerating.value = false // 异常后重置
         }
     }
 
@@ -109,6 +116,7 @@ export function useSceneWorkflow() {
         script,
         extracting,
         generatingSceneImages,
+        batchGenerating, // 导出批量生成状态
         loadScript,
         extractScenes,
         generateSceneImages,

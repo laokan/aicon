@@ -72,6 +72,7 @@
             :can-generate="canGenerateSceneImages"
             :api-keys="apiKeys"
             :generating-ids="sceneWorkflow.generatingSceneImages.value"
+            :batch-generating="sceneWorkflow.batchGenerating.value"
             @batch-generate="handleBatchGenerateSceneImages"
             @generate-scene-image="handleGenerateSceneImage"
           />

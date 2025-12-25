@@ -5,7 +5,8 @@
       <div class="actions">
         <el-button 
           type="primary"
-          :disabled="!canGenerate || generatingIds.size > 0"
+          :loading="batchGenerating"
+          :disabled="!canGenerate || generatingIds.size > 0 || batchGenerating"
           @click="handleBatchGenerateClick"
         >
           批量生成场景图
@@ -220,6 +221,10 @@ const props = defineProps({
   generatingIds: {
     type: Set,
     default: () => new Set()
+  },
+  batchGenerating: {
+    type: Boolean,
+    default: false
   }
 })
 
