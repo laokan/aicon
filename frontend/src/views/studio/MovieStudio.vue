@@ -432,13 +432,12 @@ const handleStartComposition = async () => {
       }
     )
     
-    // 跳转到 VideoTasks 页面，并传递 script_id
+    // 跳转到 VideoTasks 页面，只传递 type 和 chapterId
     router.push({
       name: 'VideoTasks',
       query: {
         action: 'create',
         type: 'movie_composition',
-        scriptId: sceneWorkflow.script.value?.id,
         chapterId: selectedChapterId.value
       }
     })

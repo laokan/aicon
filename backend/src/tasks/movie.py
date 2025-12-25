@@ -188,7 +188,6 @@ async def sync_transition_video_status(db_session: AsyncSession, self):
     logger.info(f"Celery任务完成: sync_transition_video_status, 结果: {result}")
     return result
 
-# Removed: sync_all_video_task_status - obsolete, replaced by transition video status sync
 
 @celery_app.task(
     bind=True,

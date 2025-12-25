@@ -12,6 +12,7 @@ from .base import PaginatedResponse, UUIDMixin
 
 class VideoTaskCreate(BaseModel):
     """创建视频任务请求模型"""
+    task_type: str = Field("picture_narration", description="任务类型（picture_narration/movie_composition）")
     chapter_id: UUID = Field(..., description="章节ID")
     api_key_id: Optional[UUID] = Field(None, description="API密钥ID（可选，用于LLM字幕纠错）")
     bgm_id: Optional[UUID] = Field(None, description="BGM ID（可选，用于背景音乐）")
@@ -20,6 +21,7 @@ class VideoTaskCreate(BaseModel):
     model_config = {
         "json_schema_extra": {
             "example": {
+                "task_type": "picture_narration",
                 "chapter_id": "uuid-string",
                 "api_key_id": "uuid-string",
                 "gen_setting": {
@@ -49,6 +51,7 @@ class VideoTaskResponse(UUIDMixin):
     user_id: UUID = Field(..., description="用户ID")
     project_id: UUID = Field(..., description="项目ID")
     chapter_id: UUID = Field(..., description="章节ID")
+    task_type: str = Field("picture_narration", description="任务类型")
     api_key_id: Optional[UUID] = Field(None, description="API密钥ID")
     status: str = Field(..., description="任务状态")
     progress: int = Field(0, description="处理进度（0-100）")

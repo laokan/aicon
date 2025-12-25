@@ -37,6 +37,7 @@ class VideoTaskService(BaseService):
             user_id: str,
             project_id: str,
             chapter_id: str,
+            task_type: str = "picture_narration",
             api_key_id: Optional[str] = None,
             bgm_id: Optional[str] = None,
             background_id: Optional[str] = None,
@@ -49,6 +50,7 @@ class VideoTaskService(BaseService):
             user_id: 用户ID
             project_id: 项目ID
             chapter_id: 章节ID
+            task_type: 任务类型（picture_narration/movie_composition）
             api_key_id: API密钥ID（可选）
             background_id: 背景音乐/图片ID（可选）
             gen_setting: 生成设置（可选）
@@ -62,6 +64,7 @@ class VideoTaskService(BaseService):
                 user_id=user_id,
                 project_id=project_id,
                 chapter_id=chapter_id,
+                task_type=task_type,
                 api_key_id=api_key_id,
                 background_id=bgm_id or background_id,  # bgm_id优先
                 status=VideoTaskStatus.PENDING

@@ -84,6 +84,30 @@ class MovieVideoService(BaseService):
         logger.info(f"章节 {chapter_id} 共有 {len(shots)} 个分镜")
         return shots
 
+    async def _get_chapter_transitions(self, chapter_id: str) -> List:
+        """
+        获取章节的所有过渡视频(按顺序)
+        
+        Args:
+            chapter_id: 章节ID
+            
+        Returns:
+            过渡视频列表(按order_index排序)
+        """
+        from src.models.movie import MovieTransition
+        
+        result = await self.db_session.execute(
+            select(MovieTransition)
+            .join(MovieScript)
+            .where(MovieScript.chapter_id == chapter_id)
+            .where(MovieTransition.video_url.isnot(None))
+            .order_by(MovieTransition.order_index)
+        )
+        
+        transitions = result.scalars().all()
+        logger.info(f"章节 {chapter_id} 共有 {len(transitions)} 个过渡视频")
+        return transitions
+
     async def _validate_shot_videos(self, shots: List[MovieShot]) -> None:
         """
         验证所有分镜都有视频
@@ -113,6 +137,36 @@ class MovieVideoService(BaseService):
             raise BusinessLogicError(error_msg)
         
         logger.info(f"✅ 所有 {len(shots)} 个分镜视频验证通过")
+
+    async def _validate_transition_videos(self, transitions: List) -> None:
+        """
+        验证所有过渡视频都已生成
+        
+        Args:
+            transitions: 过渡视频列表
+            
+        Raises:
+            BusinessLogicError: 如果有过渡视频缺失或状态不正确
+        """
+        missing_videos = []
+        
+        for transition in transitions:
+            if not transition.video_url:
+                missing_videos.append(
+                    f"过渡{transition.order_index}: 缺少视频"
+                )
+            elif transition.status != 'completed':
+                missing_videos.append(
+                    f"过渡{transition.order_index}: 状态={transition.status}"
+                )
+        
+        if missing_videos:
+            error_msg = f"过渡视频不完整,共{len(missing_videos)}个问题:\n" + "\n".join(missing_videos[:10])
+            if len(missing_videos) > 10:
+                error_msg += f"\n... 还有{len(missing_videos) - 10}个问题"
+            raise BusinessLogicError(error_msg)
+        
+        logger.info(f"✅ 所有 {len(transitions)} 个过渡视频验证通过")
 
     async def _download_shot_videos(
         self,
@@ -164,6 +218,59 @@ class MovieVideoService(BaseService):
         logger.info(f"🚀 开始并发下载 {len(shots)} 个分镜视频(并发数:5)")
         video_paths = await asyncio.gather(*tasks)
         logger.info(f"✅ 所有分镜视频下载完成")
+        
+        return video_paths
+
+    async def _download_transition_videos(
+        self,
+        transitions: List,
+        temp_dir: Path
+    ) -> List[Path]:
+        """
+        并发下载所有过渡视频
+        
+        Args:
+            transitions: 过渡视频列表
+            temp_dir: 临时目录
+            
+        Returns:
+            下载后的本地视频路径列表(按顺序)
+        """
+        storage_client = await self._get_storage_client()
+        
+        async def download_one(transition, index: int) -> Path:
+            """下载单个过渡视频"""
+            video_path = temp_dir / f"transition_{index:03d}.mp4"
+            
+            try:
+                logger.info(f"📥 下载过渡视频 {index + 1}/{len(transitions)}: {transition.video_url}")
+                content = await storage_client.download_file(transition.video_url)
+                
+                with open(video_path, 'wb') as f:
+                    f.write(content)
+                
+                logger.info(f"✅ 过渡视频 {index + 1} 下载完成: {len(content)} bytes")
+                return video_path
+                
+            except Exception as e:
+                logger.error(f"❌ 过渡视频 {index + 1} 下载失败: {e}")
+                raise BusinessLogicError(f"下载过渡视频失败: 过渡{transition.order_index}")
+        
+        # 并发下载,限制并发数为5
+        semaphore = asyncio.Semaphore(5)
+        
+        async def download_with_limit(transition, idx: int) -> Path:
+            async with semaphore:
+                return await download_one(transition, idx)
+        
+        tasks = [
+            download_with_limit(transition, idx)
+            for idx, transition in enumerate(transitions)
+        ]
+        
+        logger.info(f"🚀 开始并发下载 {len(transitions)} 个过渡视频(并发数:5)")
+        video_paths = await asyncio.gather(*tasks)
+        logger.info(f"✅ 所有过渡视频下载完成")
         
         return video_paths
 
@@ -441,6 +548,116 @@ class MovieVideoService(BaseService):
             
         except Exception as e:
             logger.error(f"电影视频合成失败: {e}", exc_info=True)
+            
+            # 标记任务失败
+            try:
+                task_service = VideoTaskService(self.db_session)
+                await task_service.mark_task_failed(video_task_id, str(e))
+            except Exception as mark_error:
+                logger.error(f"标记任务失败时出错: {mark_error}")
+            
+            raise
+            
+        finally:
+            # 清理临时目录
+            if temp_dir and temp_dir.exists():
+                try:
+                    shutil.rmtree(temp_dir)
+                    logger.info(f"清理临时目录: {temp_dir}")
+                except Exception as e:
+                    logger.error(f"清理临时目录失败: {e}")
+
+    async def synthesize_movie_from_transitions(self, video_task_id: str) -> dict:
+        """
+        从过渡视频合成电影 - 新的合成方法
+        
+        Args:
+            video_task_id: 视频任务ID
+            
+        Returns:
+            统计信息字典
+        """
+        temp_dir = None
+        
+        try:
+            # 检查FFmpeg
+            if not check_ffmpeg_installed():
+                raise BusinessLogicError("FFmpeg未安装或不可用")
+            
+            # 1. 加载视频任务
+            task_service = VideoTaskService(self.db_session)
+            task = await task_service.get_video_task_by_id(video_task_id)
+            
+            # 2. 验证任务状态
+            if task.status not in [VideoTaskStatus.PENDING.value, VideoTaskStatus.FAILED.value]:
+                raise BusinessLogicError(f"任务状态不正确: {task.status}")
+            
+            # 3. 更新状态为验证中
+            await task_service.update_task_status(task.id, VideoTaskStatus.VALIDATING)
+            
+            logger.info(f"🎬 开始从过渡视频合成电影: chapter_id={task.chapter_id}")
+            
+            # 4. 获取所有过渡视频
+            transitions = await self._get_chapter_transitions(task.chapter_id)
+            
+            if not transitions:
+                raise BusinessLogicError("章节没有过渡视频")
+            
+            # 5. 验证过渡视频完整性
+            await self._validate_transition_videos(transitions)
+            
+            # 6. 创建临时目录
+            temp_dir = Path(tempfile.mkdtemp(prefix="movie_composition_"))
+            logger.info(f"创建临时目录: {temp_dir}")
+            
+            # 7. 更新状态为下载素材
+            await task_service.update_task_status(task.id, VideoTaskStatus.DOWNLOADING_MATERIALS)
+            task.update_progress(20)
+            await self.db_session.flush()
+            
+            # 8. 并发下载所有过渡视频
+            video_paths = await self._download_transition_videos(transitions, temp_dir)
+            
+            # 9. 更新状态为拼接中
+            await task_service.update_task_status(task.id, VideoTaskStatus.CONCATENATING)
+            task.update_progress(60)
+            await self.db_session.flush()
+            
+            # 10. 拼接视频
+            final_video_path = await self._concatenate_videos(video_paths, temp_dir)
+            
+            # 11. 混合BGM(如果有)
+            if task.background_id:
+                task.update_progress(75)
+                await self.db_session.flush()
+                final_video_path = await self._mix_bgm(final_video_path, task, temp_dir)
+            
+            # 12. 更新状态为上传中
+            await task_service.update_task_status(task.id, VideoTaskStatus.UPLOADING)
+            task.update_progress(85)
+            await self.db_session.flush()
+            
+            # 13. 上传到MinIO
+            video_key, duration = await self._upload_video(final_video_path, task)
+            
+            # 14. 更新章节视频信息
+            await self._update_chapter_video(task.chapter_id, video_key, duration)
+            
+            # 15. 标记任务完成
+            await task_service.mark_task_completed(task.id, video_key, duration)
+            task.update_progress(100)
+            await self.db_session.flush()
+            
+            logger.info(f"🎉 电影合成完成: video_key={video_key}, duration={duration}s")
+            
+            return {
+                "total_transitions": len(transitions),
+                "video_key": video_key,
+                "duration": duration
+            }
+            
+        except Exception as e:
+            logger.error(f"电影合成失败: {e}", exc_info=True)
             
             # 标记任务失败
             try:

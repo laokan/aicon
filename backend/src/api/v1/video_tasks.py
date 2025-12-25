@@ -38,6 +38,8 @@ async def create_video_task(
         task_data: VideoTaskCreate
 ):
     """创建视频生成任务"""
+    from src.models.video_task import VideoTaskType
+    
     video_task_service = VideoTaskService(db)
     chapter_service = ChapterService(db)
     project_service = ProjectService(db)
@@ -51,13 +53,19 @@ async def create_video_task(
         user_id=str(current_user.id),
         project_id=str(chapter.project_id),
         chapter_id=str(task_data.chapter_id),
+        task_type=task_data.task_type,
         api_key_id=str(task_data.api_key_id) if task_data.api_key_id else None,
         bgm_id=str(task_data.bgm_id) if task_data.bgm_id else None,
         gen_setting=task_data.gen_setting
     )
 
-    # 触发Celery任务
-    synthesize_video.delay(str(task.id))
+    # 根据任务类型触发不同的Celery任务
+    if task_data.task_type == VideoTaskType.MOVIE_COMPOSITION.value:
+        from src.tasks.movie import movie_compose_video
+        movie_compose_video.delay(str(task.id))
+    else:
+        # 默认：图解说视频
+        synthesize_video.delay(str(task.id))
 
     # 获取章节和项目标题
     response_data = task.to_dict()
@@ -65,6 +73,7 @@ async def create_video_task(
     response_data['project_title'] = (await project_service.get_project_by_id(str(chapter.project_id), str(current_user.id))).title
 
     return VideoTaskResponse.from_dict(response_data)
+
 
 
 @router.get("/", response_model=VideoTaskListResponse)

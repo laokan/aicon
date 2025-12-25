@@ -165,6 +165,7 @@
     <!-- 对话框组件 -->
     <CreateVideoTaskDialog 
       v-model="showCreateDialog"
+      :initial-params="movieCompositionParams"
       @success="handleCreateSuccess"
     />
     
@@ -182,7 +183,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { 
   Plus, 
   Refresh, 
@@ -197,6 +199,8 @@ import { formatDate } from '@/utils/dateUtils'
 import CreateVideoTaskDialog from '@/components/video/CreateVideoTaskDialog.vue'
 import VideoTaskDetailDialog from '@/components/video/VideoTaskDetailDialog.vue'
 import VideoPreviewDialog from '@/components/video/VideoPreviewDialog.vue'
+
+const route = useRoute()
 
 const { 
   tasks, 
@@ -222,10 +226,23 @@ const selectedTaskId = ref('')
 const previewUrl = ref('')
 const previewTitle = ref('')
 
+// 电影合成相关状态
+const movieCompositionParams = ref(null)
+
 // 生命周期
 onMounted(() => {
   refreshList()
   startPolling(3000, getQueryParams())
+  
+  // 检查 URL 查询参数，如果是从 MovieStudio 跳转过来的
+  if (route.query.action === 'create' && route.query.type === 'movie_composition') {
+    movieCompositionParams.value = {
+      type: 'movie_composition',
+      chapterId: route.query.chapterId
+    }
+    // 自动打开创建对话框
+    showCreateDialog.value = true
+  }
 })
 
 onUnmounted(() => {

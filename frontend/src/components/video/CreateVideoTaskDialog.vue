@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    title="新建视频生成任务"
+    :title="dialogTitle"
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
     width="600px"
@@ -13,10 +13,19 @@
       label-width="100px"
       v-loading="loading"
     >
+      <!-- 任务类型选择 -->
+      <el-form-item label="任务类型" prop="task_type">
+        <el-radio-group v-model="form.task_type" :disabled="isMovieComposition">
+          <el-radio-button value="picture_narration">图解说视频</el-radio-button>
+          <el-radio-button value="movie_composition">电影合成</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+
+      <!-- 选择章节（两种类型都需要） -->
       <el-form-item label="选择章节" prop="chapter_id">
         <el-select
           v-model="form.chapter_id"
-          placeholder="请选择已准备好素材的章节"
+          :placeholder="form.task_type === 'movie_composition' ? '请选择已完成电影制作的章节' : '请选择已准备好素材的章节'"
           filterable
           remote
           :remote-method="searchChapters"
@@ -35,7 +44,14 @@
             </span>
           </el-option>
         </el-select>
-        <div class="form-tip">仅显示状态为"素材已准备"的章节</div>
+        <div class="form-tip">
+          <template v-if="form.task_type === 'picture_narration'">
+            仅显示状态为"素材已准备"的章节
+          </template>
+          <template v-else>
+            将使用该章节的电影剧本，合成所有关键帧和过渡视频
+          </template>
+        </div>
       </el-form-item>
 
       <el-divider content-position="left">生成设置</el-divider>
@@ -201,7 +217,8 @@ import bgmService from '@/services/bgm'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps({
-  modelValue: Boolean
+  modelValue: Boolean,
+  initialParams: Object  // 从 MovieStudio 传递的初始参数
 })
 
 const emit = defineEmits(['update:modelValue', 'success'])
@@ -222,6 +239,7 @@ const zoomSpeedDisplay = ref(5) // 对应 0.0005
 const bgmVolumeDisplay = ref(15) // 对应 0.15
 
 const form = reactive({
+  task_type: 'picture_narration',  // 'picture_narration' | 'movie_composition'
   chapter_id: '',
   api_key_id: '',
   bgm_id: '',
@@ -244,16 +262,30 @@ const form = reactive({
   }
 })
 
-const rules = {
+// 电影合成相关状态
+const isMovieComposition = computed(() => !!props.initialParams?.type)
+
+// 对话框标题
+const dialogTitle = computed(() => {
+  return form.task_type === 'movie_composition' ? '新建电影合成任务' : '新建视频生成任务'
+})
+
+const rules = computed(() => ({
+  task_type: [{ required: true, message: '请选择任务类型', trigger: 'change' }],
   chapter_id: [{ required: true, message: '请选择章节', trigger: 'change' }],
   'gen_setting.resolution': [{ required: true, message: '请选择分辨率', trigger: 'change' }],
   'gen_setting.fps': [{ required: true, message: '请选择帧率', trigger: 'change' }]
-}
+}))
 
 // 监听器
 watch(() => props.modelValue, (val) => {
   if (val) {
     loadData()
+    // 如果有初始参数（从 MovieStudio 跳转），预填充表单
+    if (props.initialParams) {
+      form.task_type = props.initialParams.type || 'picture_narration'
+      form.chapter_id = props.initialParams.chapterId || ''
+    }
   } else {
     resetForm()
   }
@@ -321,6 +353,7 @@ const submitForm = async () => {
       submitting.value = true
       try {
         await createTask({
+          task_type: form.task_type,
           chapter_id: form.chapter_id,
           api_key_id: form.api_key_id || null,
           bgm_id: form.bgm_id || null,
@@ -348,6 +381,7 @@ const resetForm = () => {
   if (formRef.value) {
     formRef.value.resetFields()
   }
+  form.task_type = 'picture_narration'
   form.chapter_id = ''
   form.api_key_id = ''
   // 重置为默认值

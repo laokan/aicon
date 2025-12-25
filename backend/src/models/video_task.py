@@ -31,6 +31,13 @@ class VideoTaskStatus(str, Enum):
     FAILED = "failed"  # 失败
 
 
+class VideoTaskType(str, Enum):
+    """视频任务类型枚举"""
+    PICTURE_NARRATION = "picture_narration"  # 图解说视频（基于句子+图片）
+    MOVIE_COMPOSITION = "movie_composition"  # 电影合成（基于关键帧+过渡视频）
+
+
+
 class VideoTask(BaseModel):
     """视频任务模型 - 视频生成任务管理"""
     __tablename__ = 'video_tasks'
@@ -39,6 +46,7 @@ class VideoTask(BaseModel):
     user_id = Column(PostgreSQLUUID(as_uuid=True), nullable=False, index=True, comment="用户ID（外键索引，无约束）")
     project_id = Column(PostgreSQLUUID(as_uuid=True), ForeignKey('projects.id'), nullable=False, index=True, comment="项目ID（外键索引，无约束）")
     chapter_id = Column(PostgreSQLUUID(as_uuid=True), ForeignKey('chapters.id'), nullable=False, index=True, comment="章节ID（外键索引，无约束）")
+    task_type = Column(String(30), default=VideoTaskType.PICTURE_NARRATION.value, nullable=False, index=True, comment="任务类型（picture_narration/movie_composition）")
     api_key_id = Column(PostgreSQLUUID(as_uuid=True), nullable=True, index=True, comment="API密钥ID（可选）")
     background_id = Column(PostgreSQLUUID(as_uuid=True), nullable=True, comment="背景音乐/图片ID（可选）")
 
@@ -71,12 +79,14 @@ class VideoTask(BaseModel):
         Index('idx_video_task_user', 'user_id'),
         Index('idx_video_task_project', 'project_id'),
         Index('idx_video_task_chapter', 'chapter_id'),
+        Index('idx_video_task_type', 'task_type'),
         Index('idx_video_task_status', 'status'),
         Index('idx_video_task_created', 'created_at'),
     )
 
     def __repr__(self) -> str:
-        return f"<VideoTask(id={self.id}, status={self.status}, progress={self.progress}%)>"
+        return f"<VideoTask(id={self.id}, type={self.task_type}, status={self.status}, progress={self.progress}%)>"
+
 
     def to_dict(self, exclude: Optional[list] = None) -> Dict:
         """
@@ -259,4 +269,5 @@ class VideoTask(BaseModel):
 __all__ = [
     "VideoTask",
     "VideoTaskStatus",
+    "VideoTaskType",
 ]
