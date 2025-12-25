@@ -218,8 +218,7 @@ const handleExtractShots = async (apiKeyId, model) => {
     ElMessage.warning('请先提取场景')
     return
   }
-  await shotWorkflow.extractShots(sceneWorkflow.script.value.id, apiKeyId, model)
-  await loadData(true)  // skipStepUpdate=true 保持当前步骤
+  await shotWorkflow.extractShots(sceneWorkflow.script.value.id, apiKeyId, model, sceneWorkflow.loadScript)
 }
 
 const handleBatchGenerateKeyframes = async (apiKeyId, model) => {
@@ -227,13 +226,11 @@ const handleBatchGenerateKeyframes = async (apiKeyId, model) => {
     ElMessage.warning('请先提取场景')
     return
   }
-  await shotWorkflow.generateKeyframes(sceneWorkflow.script.value.id, apiKeyId, model)
-  await loadData(true)
+  await shotWorkflow.generateKeyframes(sceneWorkflow.script.value.id, apiKeyId, model, sceneWorkflow.loadScript)
 }
 
 const handleGenerateSingleKeyframe = async (shotId, apiKeyId, model, prompt) => {
-  await shotWorkflow.generateSingleKeyframe(shotId, apiKeyId, model, prompt)
-  await loadData(true)
+  await shotWorkflow.generateSingleKeyframe(shotId, apiKeyId, model, prompt, sceneWorkflow.loadScript)
 }
 
 const handleBatchGenerateSceneImages = async (apiKeyId, model) => {
@@ -241,13 +238,11 @@ const handleBatchGenerateSceneImages = async (apiKeyId, model) => {
     ElMessage.warning('请先提取场景')
     return
   }
-  await sceneWorkflow.generateSceneImages(sceneWorkflow.script.value.id, apiKeyId, model)
-  await loadData(true)
+  await sceneWorkflow.generateSceneImages(sceneWorkflow.script.value.id, apiKeyId, model, sceneWorkflow.loadScript)
 }
 
 const handleGenerateSceneImage = async (sceneId, apiKeyId, model, prompt) => {
-  await sceneWorkflow.generateSingleSceneImage(sceneId, apiKeyId, model, prompt)
-  await loadData(true)
+  await sceneWorkflow.generateSingleSceneImage(sceneId, apiKeyId, model, prompt, sceneWorkflow.loadScript)
 }
 
 const handleCreateTransitions = async (apiKeyId, model) => {

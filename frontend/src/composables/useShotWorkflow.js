@@ -27,7 +27,7 @@ export function useShotWorkflow(script) {
         })).filter(group => group.shots.length > 0)
     })
 
-    const extractShots = async (scriptId, apiKeyId, model) => {
+    const extractShots = async (scriptId, apiKeyId, model, loadScript) => {
         extracting.value = true
         try {
             const response = await movieService.extractShots(scriptId, {
@@ -41,8 +41,10 @@ export function useShotWorkflow(script) {
                 startPolling(response.task_id, async (result) => {
                     ElMessage.success(`分镜提取完成: 成功 ${result.success}, 失败 ${result.failed}`)
                     extracting.value = false
-                    // Reload script to get shots
-                    window.location.reload() // Temporary solution
+                    // 只刷新script数据，不刷新整个页面
+                    if (script.value?.chapter_id && loadScript) {
+                        await loadScript(script.value.chapter_id, true) // skipStepUpdate=true
+                    }
                 }, (error) => {
                     ElMessage.error(`提取失败: ${error.message}`)
                     extracting.value = false
@@ -54,7 +56,7 @@ export function useShotWorkflow(script) {
         }
     }
 
-    const generateKeyframes = async (scriptId, apiKeyId, model) => {
+    const generateKeyframes = async (scriptId, apiKeyId, model, loadScript) => {
         try {
             const response = await movieService.generateKeyframes(scriptId, {
                 api_key_id: apiKeyId,
@@ -70,7 +72,10 @@ export function useShotWorkflow(script) {
                     } else {
                         ElMessage.success(`关键帧生成完成: 共 ${result.success} 个分镜`)
                     }
-                    window.location.reload() // Temporary solution
+                    // 只刷新script数据，不刷新整个页面
+                    if (script.value?.chapter_id && loadScript) {
+                        await loadScript(script.value.chapter_id, true) // skipStepUpdate=true
+                    }
                 }, (error) => {
                     ElMessage.error(`生成失败: ${error.message}`)
                 })
@@ -80,7 +85,7 @@ export function useShotWorkflow(script) {
         }
     }
 
-    const generateSingleKeyframe = async (shotId, apiKeyId, model, prompt) => {
+    const generateSingleKeyframe = async (shotId, apiKeyId, model, prompt, loadScript) => {
         generatingKeyframes.value.add(shotId)
         try {
             const response = await movieService.generateSingleKeyframe(shotId, {
@@ -97,7 +102,10 @@ export function useShotWorkflow(script) {
                     async () => {
                         ElMessage.success('关键帧生成完成')
                         generatingKeyframes.value.delete(shotId)
-                        window.location.reload()
+                        // 只刷新script数据，不刷新整个页面
+                        if (script.value?.chapter_id && loadScript) {
+                            await loadScript(script.value.chapter_id, true) // skipStepUpdate=true
+                        }
                     },
                     // Error callback
                     (error) => {
