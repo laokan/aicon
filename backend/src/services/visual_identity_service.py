@@ -60,6 +60,29 @@ async def _generate_keyframe_worker(
                 custom_prompt=None  # worker中不使用自定义提示词
             )
             
+            # 1.5 收集参考图：场景图 + 角色图
+            reference_images = []
+            
+            # 首先添加场景图（如果存在）
+            if scene.scene_image_url:
+                reference_images.append(scene.scene_image_url)
+                logger.info(f'[批量生成] 添加场景参考图: {scene.scene_image_url}')
+            else:
+                # 抛出异常
+                raise ValueError(f"场景 {scene.id} 没有场景图")
+            
+            # 然后添加角色参考图
+            if shot.characters:
+                # 获取出现在此镜头中的角色
+                shot_char_names = shot.characters if isinstance(shot.characters, list) else []
+                relevant_chars = [c for c in chars if c.name in shot_char_names]
+                
+                # 收集角色的参考图URL
+                for char in relevant_chars:
+                    if char.avatar_url:
+                        reference_images.append(char.avatar_url)
+                        logger.info(f'[批量生成] 添加角色 {char.name} 的参考图: {char.avatar_url}')
+            
             # 2. Provider 调用
             img_provider = ProviderFactory.create(
                 provider=api_key.provider,
@@ -67,7 +90,7 @@ async def _generate_keyframe_worker(
                 base_url=api_key.base_url
             )
 
-            logger.info(f"生成分镜 {shot.id} 关键帧, Prompt: {final_prompt[:100]}...")
+            logger.info(f"生成分镜 {shot.id} 关键帧, 参考图数量={len(reference_images)}, Prompt: {final_prompt[:100]}...")
             
             # 准备生成参数
             gen_params = {
@@ -75,7 +98,10 @@ async def _generate_keyframe_worker(
                 "model": model
             }
             
-            # 某些 provider 支持参考图 (如 SiliconFlow)        
+            # 如果有参考图，添加到参数中
+            if reference_images:
+                gen_params["reference_images"] = reference_images
+            
             result = await retry_with_backoff(
                 lambda: img_provider.generate_image(**gen_params)
             )
