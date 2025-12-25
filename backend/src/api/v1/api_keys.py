@@ -215,7 +215,7 @@ async def get_api_key_models(
     current_user: User = Depends(get_current_user_required),
     db: AsyncSession = Depends(get_db),
     key_id: str,
-    type: str = Query("text", description="模型类型: text 或 image")
+    type: str = Query("text", description="模型类型: text, image 或 video")
 ):
     """获取API密钥可用的模型列表"""
     api_key_service = APIKeyService(db)

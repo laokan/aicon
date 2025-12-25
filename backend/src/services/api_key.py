@@ -247,17 +247,19 @@ class APIKeyService(BaseService):
         获取API密钥可用的模型列表
         
         Args:
-            key_id: 密钥ID
+            key_id: API密钥ID
             user_id: 用户ID
-            model_type: 模型类型，text 或 image
+            model_type: 模型类型 (text/image/video)
             
         Returns:
-            模型名称列表
+            List[str]: 模型列表
         """
+        # 验证key存在且属于当前用户
         api_key = await self.get_api_key_by_id(key_id, user_id)
         
         provider = api_key.provider.lower()
         
+        # SiliconFlow provider - 从API获取模型列表
         if provider == 'siliconflow':
             import httpx
             try:
@@ -274,8 +276,6 @@ class APIKeyService(BaseService):
                     
                     if response.status_code == 200:
                         data = response.json()
-                        # 假设返回格式为 {"data": [{"id": "model_name", ...}, ...]}
-                        # 根据文档 https://docs.siliconflow.cn/cn/api-reference/models/get-model-list
                         return [model["id"] for model in data.get("data", [])]
                     else:
                         logger.error(f"获取SiliconFlow模型失败: {response.text}")
@@ -283,15 +283,18 @@ class APIKeyService(BaseService):
             except Exception as e:
                 logger.error(f"获取SiliconFlow模型异常: {e}")
                 return []
-                
+        
+        # Custom provider - 返回预定义模型列表
         elif provider == 'custom':
             if model_type == "image":
-                return ['gemini-3-pro-image-preview','dall-e-3', 'doubao-seedream-3-0-t2i-250415', 'doubao-seedream-4-0-250828','sora_image']
+                return ['gemini-3-pro-image-preview', 'dall-e-3', 'doubao-seedream-3-0-t2i-250415', 'doubao-seedream-4-0-250828', 'sora_image']
             elif model_type == "audio":
                 return ['gpt-4o-mini-tts', 'tts-1']
-            else:
-                return ['gemini-3-flash-preview','deepseek-chat', 'deepseek-r1']
-            
+            elif model_type == "video":
+                return ['veo_3_1-fast', 'veo_3_1']
+            else:  # text
+                return ['gemini-3-flash-preview', 'deepseek-chat', 'deepseek-r1']
+        
         return []
 
 

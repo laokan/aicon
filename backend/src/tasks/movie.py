@@ -129,7 +129,42 @@ async def movie_generate_single_keyframe(db_session: AsyncSession, self, shot_id
     url = await service.generate_single_keyframe(shot_id, api_key_id, model, prompt)
     
     logger.info(f"Celery任务完成: movie_generate_single_keyframe")
-    return {"keyframe_url": url}
+    return {"success": True}
+
+@celery_app.task(
+    bind=True,
+    max_retries=0,
+    name="movie.generate_transition_videos"
+)
+@async_task_decorator
+async def movie_generate_transition_videos(db_session: AsyncSession, self, script_id: str, api_key_id: str, video_model: str):
+    """批量生成过渡视频的 Celery 任务"""
+    from src.services.transition_service import TransitionService
+    logger.info(f"Celery任务开始: movie_generate_transition_videos (script_id={script_id})")
+    
+    service = TransitionService(db_session)
+    # TODO: 实现批量生成逻辑
+    result = {"success": 0, "failed": 0, "message": "批量生成功能待实现"}
+    
+    logger.info(f"Celery任务完成: movie_generate_transition_videos")
+    return result
+
+@celery_app.task(
+    bind=True,
+    max_retries=0,
+    name="movie.generate_single_transition"
+)
+@async_task_decorator
+async def movie_generate_single_transition(db_session: AsyncSession, self, transition_id: str, api_key_id: str, video_model: str):
+    """生成单个过渡视频的 Celery 任务"""
+    from src.services.transition_service import TransitionService
+    logger.info(f"Celery任务开始: movie_generate_single_transition (transition_id={transition_id})")
+    
+    service = TransitionService(db_session)
+    task_id = await service.generate_transition_video(transition_id, api_key_id, video_model)
+    
+    logger.info(f"Celery任务完成: movie_generate_single_transition, task_id={task_id}")
+    return {"success": True, "video_task_id": task_id}
 
 # Removed: movie_batch_produce_shots - obsolete, replaced by transition workflow
 
