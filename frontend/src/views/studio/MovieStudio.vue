@@ -107,10 +107,98 @@
             <el-result
               icon="success"
               title="所有步骤已完成"
-              sub-title="可以开始最终合成了"
+              sub-title="检查素材准备情况，开始最终合成"
             >
               <template #extra>
-                <el-button type="primary" size="large">开始合成</el-button>
+                <el-space direction="vertical" :size="20" style="width: 100%;">
+                  <el-button 
+                    type="primary" 
+                    size="large"
+                    @click="handleCheckMaterials"
+                    :loading="checkingMaterials"
+                  >
+                    检查素材并开始合成
+                  </el-button>
+                  
+                  <!-- 素材检查结果 -->
+                  <el-card v-if="materialCheckResult" class="material-check-card">
+                    <template #header>
+                      <div class="card-header">
+                        <span>素材检查结果</span>
+                        <el-tag 
+                          :type="materialCheckResult.ready ? 'success' : 'warning'"
+                          size="large"
+                        >
+                          {{ materialCheckResult.ready ? '✓ 全部就绪' : '⚠ 有缺失' }}
+                        </el-tag>
+                      </div>
+                    </template>
+                    
+                    <el-descriptions :column="1" border>
+                      <el-descriptions-item label="角色头像">
+                        <el-tag :type="materialCheckResult.characters.ready ? 'success' : 'danger'">
+                          {{ materialCheckResult.characters.ready ? '✓' : '✗' }}
+                          {{ materialCheckResult.characters.total }} 个角色
+                          <template v-if="!materialCheckResult.characters.ready">
+                            ，缺少 {{ materialCheckResult.characters.missing }} 个头像
+                          </template>
+                        </el-tag>
+                      </el-descriptions-item>
+                      
+                      <el-descriptions-item label="场景图">
+                        <el-tag :type="materialCheckResult.sceneImages.ready ? 'success' : 'danger'">
+                          {{ materialCheckResult.sceneImages.ready ? '✓' : '✗' }}
+                          {{ materialCheckResult.sceneImages.total }} 个场景
+                          <template v-if="!materialCheckResult.sceneImages.ready">
+                            ，缺少 {{ materialCheckResult.sceneImages.missing }} 个场景图
+                          </template>
+                        </el-tag>
+                      </el-descriptions-item>
+                      
+                      <el-descriptions-item label="关键帧">
+                        <el-tag :type="materialCheckResult.keyframes.ready ? 'success' : 'danger'">
+                          {{ materialCheckResult.keyframes.ready ? '✓' : '✗' }}
+                          {{ materialCheckResult.keyframes.total }} 个分镜
+                          <template v-if="!materialCheckResult.keyframes.ready">
+                            ，缺少 {{ materialCheckResult.keyframes.missing }} 个关键帧
+                          </template>
+                        </el-tag>
+                      </el-descriptions-item>
+                      
+                      <el-descriptions-item label="过渡视频">
+                        <el-tag :type="materialCheckResult.transitions.ready ? 'success' : 'danger'">
+                          {{ materialCheckResult.transitions.ready ? '✓' : '✗' }}
+                          {{ materialCheckResult.transitions.total }} 个过渡
+                          <template v-if="!materialCheckResult.transitions.ready">
+                            ，缺少 {{ materialCheckResult.transitions.missing }} 个视频
+                          </template>
+                        </el-tag>
+                      </el-descriptions-item>
+                    </el-descriptions>
+                    
+                    <div style="margin-top: 20px; text-align: center;">
+                      <el-button 
+                        v-if="materialCheckResult.ready"
+                        type="success" 
+                        size="large"
+                        @click="handleStartComposition"
+                      >
+                        <el-icon><VideoCamera /></el-icon>
+                        开始合成电影
+                      </el-button>
+                      <el-alert
+                        v-else
+                        type="warning"
+                        :closable="false"
+                        show-icon
+                      >
+                        <template #title>
+                          请先完成缺失的素材生成，然后重新检查
+                        </template>
+                      </el-alert>
+                    </div>
+                  </el-card>
+                </el-space>
               </template>
             </el-result>
           </div>
@@ -131,9 +219,9 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowLeft, VideoCamera } from '@element-plus/icons-vue'
 
 import ChapterSelector from '@/components/studio/ChapterSelector.vue'
 import WorkflowStepper from '@/components/studio/WorkflowStepper.vue'
@@ -148,6 +236,7 @@ import StudioDialogs from '@/components/studio/StudioDialogs.vue'
 import { useMovieWorkflow } from '@/composables/useMovieWorkflow'
 
 const route = useRoute()
+const router = useRouter()
 
 const {
   projectId,
@@ -177,6 +266,10 @@ const showSceneDialog = ref(false)
 const showShotDialog = ref(false)
 const showKeyframeDialog = ref(false)
 const showTransitionDialog = ref(false)
+
+// Material check states
+const checkingMaterials = ref(false)
+const materialCheckResult = ref(null)
 
 // Event handlers
 const handleStepChange = (step) => {
@@ -265,6 +358,95 @@ const handleGenerateTransitionVideos = async (apiKeyId, videoModel) => {
   await loadData(true)  // skipStepUpdate=true 保持当前步骤
 }
 
+// Material checking
+const handleCheckMaterials = async () => {
+  checkingMaterials.value = true
+  materialCheckResult.value = null
+  
+  try {
+    // 重新加载数据确保最新
+    await loadData(true)
+    
+    // 检查各类素材
+    const characters = characterWorkflow.characters.value || []
+    const scenes = sceneWorkflow.script.value?.scenes || []
+    const shots = shotWorkflow.sceneGroups.value.flatMap(g => g.shots) || []
+    const transitions = transitionWorkflow.transitions.value || []
+    
+    // 统计缺失情况
+    const missingCharacterAvatars = characters.filter(c => !c.avatar_url).length
+    const missingSceneImages = scenes.filter(s => !s.scene_image_url).length
+    const missingKeyframes = shots.filter(s => !s.keyframe_url).length
+    const missingTransitionVideos = transitions.filter(t => !t.video_url || t.status === 'failed').length
+    
+    materialCheckResult.value = {
+      ready: missingCharacterAvatars === 0 && 
+             missingSceneImages === 0 && 
+             missingKeyframes === 0 && 
+             missingTransitionVideos === 0,
+      characters: {
+        total: characters.length,
+        missing: missingCharacterAvatars,
+        ready: missingCharacterAvatars === 0
+      },
+      sceneImages: {
+        total: scenes.length,
+        missing: missingSceneImages,
+        ready: missingSceneImages === 0
+      },
+      keyframes: {
+        total: shots.length,
+        missing: missingKeyframes,
+        ready: missingKeyframes === 0
+      },
+      transitions: {
+        total: transitions.length,
+        missing: missingTransitionVideos,
+        ready: missingTransitionVideos === 0
+      }
+    }
+    
+    if (materialCheckResult.value.ready) {
+      ElMessage.success('所有素材已准备就绪！')
+    } else {
+      ElMessage.warning('部分素材缺失，请查看详情')
+    }
+  } catch (error) {
+    console.error('检查素材失败:', error)
+    ElMessage.error('检查素材失败: ' + (error.message || '未知错误'))
+  } finally {
+    checkingMaterials.value = false
+  }
+}
+
+// Start composition
+const handleStartComposition = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要开始合成电影吗？这将创建一个视频合成任务。',
+      '确认合成',
+      {
+        confirmButtonText: '开始合成',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    )
+    
+    // 跳转到 VideoTasks 页面，并传递 script_id
+    router.push({
+      name: 'VideoTasks',
+      query: {
+        action: 'create',
+        type: 'movie_composition',
+        scriptId: sceneWorkflow.script.value?.id,
+        chapterId: selectedChapterId.value
+      }
+    })
+  } catch (e) {
+    // 用户取消
+  }
+}
+
 // Watch projectId changes
 watch(projectId, (newId) => {
   console.log('ProjectId changed:', newId)
@@ -346,5 +528,16 @@ watch(projectId, (newId) => {
   align-items: center;
   justify-content: center;
   min-height: 400px;
+}
+
+.material-check-card {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.material-check-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 </style>

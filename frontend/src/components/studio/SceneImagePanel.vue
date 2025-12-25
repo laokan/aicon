@@ -174,7 +174,7 @@
             style="font-family: monospace; font-size: 12px;"
           />
           <div style="margin-top: 8px; color: #909399; font-size: 12px;">
-            💡 提示词强调无人物的环境图，您可以根据需要调整。
+            💡 提示词已使用 Veo 3.1 最佳实践优化（摄影、氛围、风格），您可以根据需要调整。
           </div>
         </el-form-item>
       </el-form>
@@ -305,6 +305,67 @@ watch(() => sceneImageFormData.value.apiKeyId, async (newKeyId) => {
   }
 })
 
+// 构建 Veo 3.1 优化的场景图提示词
+const buildVeo31ScenePrompt = (sceneDescription) => {
+  return `Create a cinematic establishing shot of the following environment.
+This is a LIVE-ACTION PHOTOGRAPH for a film production, not CGI or 3D render.
+
+## Scene Description
+${sceneDescription}
+
+## Prompt Structure (Apply Veo 3.1 Formula)
+
+### [Cinematography]
+Choose appropriate camera work for establishing the environment:
+- Camera angle: Wide establishing shot, aerial view, crane shot, sweeping panorama, high angle (show scope), eye-level perspective
+- Composition: Rule of thirds, leading lines, depth layers (foreground/midground/background), balanced framing
+- Lens: Wide-angle lens for expansive views, deep focus to capture environmental detail
+
+### [Environment Subject]
+The location and setting itself is the subject:
+- Identify the main environmental elements (landscape, architecture, interior space, natural features)
+- Emphasize spatial relationships and scale
+- Highlight distinctive characteristics of the location
+
+### [Atmospheric Context]
+Define the temporal and weather conditions:
+- Time of day: Golden hour (warm sunset/sunrise light), blue hour (twilight), midday sun, overcast day, night
+- Weather: Clear skies, scattered clouds, fog/mist, light rain, snow, storm clouds gathering
+- Season: Spring bloom, summer lushness, autumn colors, winter bareness (if relevant)
+
+### [Style & Ambiance]
+Establish the mood and visual aesthetic:
+- Lighting quality: Soft diffused natural light, dramatic shadows and highlights, volumetric light rays through atmosphere, ambient environmental glow, harsh direct sunlight
+- Mood: Serene and peaceful, ominous and foreboding, mysterious and enigmatic, vibrant and lively, desolate and abandoned, welcoming and warm
+- Aesthetic: Cinematic film photography, photorealistic, rich color palette or muted tones, high dynamic range
+
+## Critical Requirements
+
+**UNINHABITED ENVIRONMENT - No Human Presence:**
+- This is a pristine, empty, deserted location
+- Vacant space with no people, figures, or human activity
+- Unpopulated natural landscape or abandoned built environment
+- No human silhouettes, shadows, or reflections
+- No crowds, groups, individuals, or any human-like shapes
+- The environment exists in complete solitude
+
+**Technical Specifications:**
+- Shot on professional cinema camera (ARRI Alexa, RED, Sony Venice)
+- Cinematic color grading with film look (not digital/video look)
+- High dynamic range with rich environmental detail
+- Professional landscape or architectural photography standards
+- Natural depth of field characteristic of cinema lenses
+
+**Forbidden Elements:**
+- NO 3D rendering artifacts or CGI aesthetics
+- NO video game or synthetic imagery look
+- NO people, characters, humans, persons, faces, bodies
+- NO human-made activity or human presence indicators
+- NO mannequins or human-shaped objects
+
+Generate a detailed, cinematic establishing shot that captures the essence and atmosphere of this environment.`
+}
+
 const handleBatchGenerateClick = () => {
   batchFormData.value = {
     apiKeyId: props.apiKeys[0]?.id || '',
@@ -324,26 +385,11 @@ const handleBatchDialogConfirm = () => {
 const handleGenerateSceneImage = (scene) => {
   currentScene.value = scene
   sceneImageDialogType.value = 'generate'
-  // 生成默认提示词
-  const defaultPrompt = `Create a cinematic environment shot for the following scene. Focus ONLY on the location, setting, and atmosphere. DO NOT include any people, characters, or human figures.
-
-Scene Description:
-${scene.scene}
-
-Requirements:
-- High-quality cinematic photography
-- Professional lighting and composition
-- Detailed environment and atmosphere
-- NO people, NO characters, NO humans
-- Wide or establishing shot perspective
-- Film-grade visual quality
-
-Negative Prompt: people, characters, humans, person, man, woman, child, face, body`
   
   sceneImageFormData.value = {
     apiKeyId: props.apiKeys[0]?.id || '',
     model: '',
-    prompt: scene.scene_image_prompt || defaultPrompt
+    prompt: scene.scene_image_prompt || buildVeo31ScenePrompt(scene.scene)
   }
   showSceneImageDialog.value = true
 }
@@ -351,10 +397,11 @@ Negative Prompt: people, characters, humans, person, man, woman, child, face, bo
 const handleRegenerateSceneImage = (scene) => {
   currentScene.value = scene
   sceneImageDialogType.value = 'regenerate'
+  
   sceneImageFormData.value = {
     apiKeyId: props.apiKeys[0]?.id || '',
     model: '',
-    prompt: scene.scene_image_prompt || scene.scene || ''
+    prompt: scene.scene_image_prompt || buildVeo31ScenePrompt(scene.scene)
   }
   showSceneImageDialog.value = true
 }

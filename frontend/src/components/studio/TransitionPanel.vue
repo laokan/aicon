@@ -599,19 +599,19 @@ const handleRefreshStatus = async (transition) => {
     refreshingIds.value.add(transition.id)
     
     // 调用API获取最新状态
-    const response = await api.get(`/movie-transitions/${transition.id}`)
+    const response = await api.get(`/movie/transitions/${transition.id}`)
     
     // 更新本地数据
     const index = transitions.value.findIndex(t => t.id === transition.id)
     if (index !== -1) {
-      transitions.value[index] = response.data
+      transitions.value[index] = response
       
       // 显示状态信息
-      if (response.data.status === 'completed') {
+      if (response.status === 'completed') {
         ElMessage.success('视频已生成完成！')
-      } else if (response.data.status === 'failed') {
-        ElMessage.error(`生成失败: ${response.data.error_message || '未知错误'}`)
-      } else if (response.data.status === 'processing') {
+      } else if (response.status === 'failed') {
+        ElMessage.error(`生成失败: ${response.error_message || '未知错误'}`)
+      } else if (response.status === 'processing') {
         ElMessage.info('视频仍在生成中...')
       }
     }
