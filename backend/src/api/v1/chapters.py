@@ -200,6 +200,50 @@ async def confirm_chapter(
     )
 
 
+@router.put("/{chapter_id}/update-status")
+async def update_chapter_status(
+    *,
+    current_user: User = Depends(get_current_user_required),
+    db: AsyncSession = Depends(get_db),
+    chapter_id: str,
+    new_status: str,
+):
+    """
+    更新章节状态
+    
+    用于电影工作室在素材检查完成后更新章节状态为 materials_prepared
+    """
+    chapter_service = ChapterService(db)
+
+    # 获取章节并验证权限
+    chapter = await chapter_service.get_chapter_by_id(chapter_id)
+    project_service = ProjectService(db)
+    await project_service.get_project_by_id(chapter.project_id, current_user.id)
+
+    # 更新章节状态
+    from src.models.chapter import ChapterStatus
+    
+    # 验证状态值
+    valid_statuses = [s.value for s in ChapterStatus]
+    if new_status not in valid_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"无效的状态值: {new_status}"
+        )
+    
+    updated_chapter = await chapter_service.update_chapter(
+        chapter_id=chapter_id,
+        project_id=chapter.project_id,
+        status=new_status
+    )
+
+    return {
+        "success": True,
+        "message": f"章节状态已更新为: {new_status}",
+        "chapter": ChapterResponse.from_dict(updated_chapter.to_dict())
+    }
+
+
 @router.delete("/{chapter_id}", response_model=ChapterDeleteResponse)
 async def delete_chapter(
     *,

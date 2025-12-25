@@ -417,6 +417,20 @@ const handleCheckMaterials = async () => {
     
     if (materialCheckResult.value.ready) {
       ElMessage.success('所有素材已准备就绪！')
+      
+      // 调用后端API更新章节状态为 materials_prepared
+      if (selectedChapterId.value) {
+        try {
+          const api = await import('@/services/api')
+          await api.default.put(`/chapters/${selectedChapterId.value}/update-status`, null, {
+            params: { new_status: 'materials_prepared' }
+          })
+          console.log('章节状态已更新为 materials_prepared')
+        } catch (error) {
+          console.error('更新章节状态失败:', error)
+          // 即使状态更新失败,也不影响用户继续操作
+        }
+      }
     } else {
       ElMessage.warning('部分素材缺失，请查看详情')
     }

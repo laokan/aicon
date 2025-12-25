@@ -98,13 +98,18 @@ async def synthesize_video(db_session: AsyncSession, self, video_task_id: str):
     chapter_service = ChapterService(db_session)
     chapter = await chapter_service.get_chapter_by_id(task.chapter_id)
     
-    # 3. 根据项目类型路由到不同服务
-    if chapter.project.type == 'movie':
-        # 电影类型 - 使用MovieVideoService(不加载Whisper模型)
-        logger.info(f"检测到电影类型项目,使用MovieVideoService")
+    # 3. 显式加载项目以避免懒加载问题
+    from src.services.project import ProjectService
+    project_service = ProjectService(db_session)
+    project = await project_service.get_project_by_id(chapter.project_id)
+    
+    # 4. 根据项目类型路由到不同服务
+    if project.type == 'ai_movie':
+        # 电影类型 - 使用MovieVideoService从过渡视频合成
+        logger.info(f"检测到电影类型项目,使用MovieVideoService.synthesize_movie_from_transitions")
         from src.services.movie_video_service import MovieVideoService
         service = MovieVideoService(db_session)
-        result = await service.synthesize_movie_video(video_task_id)
+        result = await service.synthesize_movie_from_transitions(video_task_id)
     else:
         # 图解说类型 - 使用VideoSynthesisService
         logger.info(f"检测到图解说类型项目,使用VideoSynthesisService")

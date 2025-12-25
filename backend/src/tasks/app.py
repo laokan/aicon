@@ -16,6 +16,7 @@ celery_app = Celery(
         "src.tasks.project",
         "src.tasks.generate",
         "src.tasks.movie",
+        "src.tasks.movie_composition",  # 电影合成任务
         "src.tasks.bilibili_task"
     ]
 )
