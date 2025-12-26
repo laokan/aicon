@@ -305,67 +305,6 @@ watch(() => sceneImageFormData.value.apiKeyId, async (newKeyId) => {
   }
 })
 
-// 构建 Veo 3.1 优化的场景图提示词
-const buildVeo31ScenePrompt = (sceneDescription) => {
-  return `Create a cinematic establishing shot of the following environment.
-This is a LIVE-ACTION PHOTOGRAPH for a film production, not CGI or 3D render.
-
-## Scene Description
-${sceneDescription}
-
-## Prompt Structure (Apply Veo 3.1 Formula)
-
-### [Cinematography]
-Choose appropriate camera work for establishing the environment:
-- Camera angle: Wide establishing shot, aerial view, crane shot, sweeping panorama, high angle (show scope), eye-level perspective
-- Composition: Rule of thirds, leading lines, depth layers (foreground/midground/background), balanced framing
-- Lens: Wide-angle lens for expansive views, deep focus to capture environmental detail
-
-### [Environment Subject]
-The location and setting itself is the subject:
-- Identify the main environmental elements (landscape, architecture, interior space, natural features)
-- Emphasize spatial relationships and scale
-- Highlight distinctive characteristics of the location
-
-### [Atmospheric Context]
-Define the temporal and weather conditions:
-- Time of day: Golden hour (warm sunset/sunrise light), blue hour (twilight), midday sun, overcast day, night
-- Weather: Clear skies, scattered clouds, fog/mist, light rain, snow, storm clouds gathering
-- Season: Spring bloom, summer lushness, autumn colors, winter bareness (if relevant)
-
-### [Style & Ambiance]
-Establish the mood and visual aesthetic:
-- Lighting quality: Soft diffused natural light, dramatic shadows and highlights, volumetric light rays through atmosphere, ambient environmental glow, harsh direct sunlight
-- Mood: Serene and peaceful, ominous and foreboding, mysterious and enigmatic, vibrant and lively, desolate and abandoned, welcoming and warm
-- Aesthetic: Cinematic film photography, photorealistic, rich color palette or muted tones, high dynamic range
-
-## Critical Requirements
-
-**UNINHABITED ENVIRONMENT - No Human Presence:**
-- This is a pristine, empty, deserted location
-- Vacant space with no people, figures, or human activity
-- Unpopulated natural landscape or abandoned built environment
-- No human silhouettes, shadows, or reflections
-- No crowds, groups, individuals, or any human-like shapes
-- The environment exists in complete solitude
-
-**Technical Specifications:**
-- Shot on professional cinema camera (ARRI Alexa, RED, Sony Venice)
-- Cinematic color grading with film look (not digital/video look)
-- High dynamic range with rich environmental detail
-- Professional landscape or architectural photography standards
-- Natural depth of field characteristic of cinema lenses
-
-**Forbidden Elements:**
-- NO 3D rendering artifacts or CGI aesthetics
-- NO video game or synthetic imagery look
-- NO people, characters, humans, persons, faces, bodies
-- NO human-made activity or human presence indicators
-- NO mannequins or human-shaped objects
-
-Generate a detailed, cinematic establishing shot that captures the essence and atmosphere of this environment.`
-}
-
 const handleBatchGenerateClick = () => {
   batchFormData.value = {
     apiKeyId: props.apiKeys[0]?.id || '',
@@ -386,10 +325,14 @@ const handleGenerateSceneImage = (scene) => {
   currentScene.value = scene
   sceneImageDialogType.value = 'generate'
   
+  // 从props.scenes中获取最新的scene数据
+  const latestScene = props.scenes.find(s => s.id === scene.id) || scene
+  
   sceneImageFormData.value = {
     apiKeyId: props.apiKeys[0]?.id || '',
     model: '',
-    prompt: scene.scene_image_prompt || buildVeo31ScenePrompt(scene.scene)
+    // 后端已经确保scene_image_prompt有值
+    prompt: latestScene.scene_image_prompt || ''
   }
   showSceneImageDialog.value = true
 }
@@ -398,10 +341,14 @@ const handleRegenerateSceneImage = (scene) => {
   currentScene.value = scene
   sceneImageDialogType.value = 'regenerate'
   
+  // 从props.scenes中获取最新的scene数据
+  const latestScene = props.scenes.find(s => s.id === scene.id) || scene
+  
   sceneImageFormData.value = {
     apiKeyId: props.apiKeys[0]?.id || '',
     model: '',
-    prompt: scene.scene_image_prompt || buildVeo31ScenePrompt(scene.scene)
+    // 使用已有的prompt
+    prompt: latestScene.scene_image_prompt || ''
   }
   showSceneImageDialog.value = true
 }

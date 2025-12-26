@@ -376,7 +376,7 @@ const createFormData = ref({
 
 const batchGenerateFormData = ref({
   apiKeyId: '',
-  videoModel: 'veo_3_1-fast'
+  videoModel: 'veo3.1-components'
 })
 
 const editPromptFormData = ref({
@@ -387,7 +387,7 @@ const editPromptFormData = ref({
 const singleGenerateFormData = ref({
   transitionId: '',
   apiKeyId: '',
-  videoModel: 'veo_3_1-fast',
+  videoModel: 'veo3.1-components',
   prompt: ''
 })
 
@@ -509,7 +509,7 @@ const handleCreateConfirm = async () => {
 const handleBatchGenerateClick = () => {
   batchGenerateFormData.value = {
     apiKeyId: props.apiKeys[0]?.id || '',
-    videoModel: 'veo_3_1-fast'
+    videoModel: 'veo3.1-components'
   }
   showBatchGenerateDialog.value = true
 }

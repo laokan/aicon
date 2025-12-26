@@ -21,6 +21,7 @@ class MovieService(BaseService):
 
     async def get_script(self, chapter_id: str):
         """获取章节的剧本（包含场景和分镜）"""
+        from src.services.movie_prompts import MoviePromptTemplates
         
         # 1. 获取剧本及其关联数据
         stmt = (
@@ -45,7 +46,6 @@ class MovieService(BaseService):
         characters = list(chars_result.scalars().all())
         
         # 3. 为每个shot生成专业提示词
-        
         for scene in script.scenes:
             for shot in scene.shots:
                 # 生成专业提示词并附加到shot对象
@@ -61,6 +61,26 @@ class MovieService(BaseService):
                 except Exception as e:
                     logger.error(f"生成shot {shot.id} 提示词失败: {e}")
                     shot.generated_prompt = shot.shot  # 降级为原始描述
+        
+        # 4. 为没有scene_image_prompt的场景生成prompt
+        modified = False
+        for scene in script.scenes:
+            if not scene.scene_image_prompt:
+                if scene.shots and len(scene.shots) > 0:
+                    # 基于分镜描述生成
+                    shots_desc = "\n\n".join([
+                        f"Shot {shot.order_index}: {shot.shot}"
+                        for shot in sorted(scene.shots, key=lambda x: x.order_index)
+                    ])
+                    scene.scene_image_prompt = MoviePromptTemplates.get_scene_image_prompt_from_shots(shots_desc)
+                else:
+                    # 基于原始场景描述生成
+                    scene.scene_image_prompt = MoviePromptTemplates.get_scene_image_prompt(scene.scene)
+                modified = True
+        
+        # 5. 如果有修改,提交到数据库
+        if modified:
+            await self.db_session.commit()
         
         return script
 

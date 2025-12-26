@@ -92,7 +92,7 @@ class CustomProvider(BaseLLMProvider):
             "candidates": [{
                 "content": {
                     "parts": [
-                        {"text": "..."},
+                        {"text": "...", "thoughtSignature": "<BASE64>"},
                         {
                             "inlineData": {
                                 "mimeType": "image/png",
@@ -103,22 +103,38 @@ class CustomProvider(BaseLLMProvider):
                 }
             }]
         }
+        
+        thoughtSignature字段包含base64编码的图片数据
         """
         try:
             parts = gemini_response["candidates"][0]["content"]["parts"]
-
+          
             base64_data = None
             mime = None
 
             # 遍历 parts 查找图片数据
             for part in parts:
-                # 检查 inlineData 字段（注意是驼峰命名）
+                # 方式1: 检查 inlineData 字段
                 if "inlineData" in part:
                     base64_data = part["inlineData"]["data"]
                     mime = part["inlineData"]["mimeType"]
+                    logger.info("从inlineData字段提取到图片数据")
                     break
+                
+                # 方式2: 检查 thoughtSignature 字段(Gemini图片生成返回格式)
+                # if "thoughtSignature" in part:
+                #     base64_data = part["thoughtSignature"]
+                #     mime = "image/png"  # Gemini默认返回PNG
+                #     logger.info(gemini_response)
+                #     logger.info(f"从thoughtSignature字段提取到图片数据(长度: {len(base64_data)})")
+                #     break
 
             if not base64_data:
+                logger.error("Gemini 响应中未找到图片数据")
+                logger.error(f"响应结构: {json.dumps(gemini_response, indent=2, ensure_ascii=False)[:500]}...")
+                # 打印parts的详细信息
+                for i, part in enumerate(parts):
+                    logger.error(f"Part {i}: keys={list(part.keys())}")
                 raise ValueError(
                     "响应中未找到图片数据 (inlineData 或 thoughtSignature)"
                 )
@@ -201,7 +217,7 @@ class CustomProvider(BaseLLMProvider):
 
         payload = {
             "contents": [{"role": "user", "parts": parts}],
-            "generationConfig": {"responseModalities": ["TEXT", "IMAGE"], "imageConfig": {"aspectRatio": aspectRatio,"imageSize": imageSize}},
+            "generationConfig": {"responseModalities": ["IMAGE"], "imageConfig": {"aspectRatio": aspectRatio,"imageSize": imageSize}},
         }   
 
         async with self.semaphore:  # 控制最大并发

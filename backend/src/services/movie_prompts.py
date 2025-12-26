@@ -400,6 +400,15 @@ Use Veo 3.1 Formula:
 - High dynamic range with rich environmental detail
 - Professional landscape or architectural photography standards
 
+**FORBIDDEN - ABSOLUTELY NO:**
+- ❌ 3D rendering or CGI aesthetics
+- ❌ Computer-generated imagery of any kind
+- ❌ Video game graphics or synthetic visuals
+- ❌ Perfect geometric shapes or artificial smoothness
+- ❌ Unnatural lighting or impossible light sources
+- ❌ Overly saturated or artificial colors
+- ❌ Clean, perfect surfaces (real world has imperfections)
+
 Generate a detailed, cinematic establishing shot that captures the environment where these shots take place."""
 
     @classmethod
