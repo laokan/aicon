@@ -5,6 +5,8 @@
       <ChapterSelector 
         v-model="selectedChapterId" 
         :project-id="projectId"
+        ref="chapterSelectorRef"
+        @create="handleChapterCreate"
       />
     </div>
 
@@ -215,6 +217,13 @@
       v-model:transition-dialog="showTransitionDialog"
     />
     
+    <!-- 章节编辑对话框 -->
+    <ChapterFormDialog
+      v-model="showChapterDialog"
+      :chapter="editingChapter"
+      @submit="handleChapterSubmit"
+    />
+    
     <!-- 电影合成对话框 -->
     <CreateMovieTaskDialog
       v-model="showMovieTaskDialog"
@@ -239,9 +248,11 @@ import SceneImagePanel from '@/components/studio/SceneImagePanel.vue'
 import KeyframePanel from '@/components/studio/KeyframePanel.vue'
 import TransitionPanel from '@/components/studio/TransitionPanel.vue'
 import StudioDialogs from '@/components/studio/StudioDialogs.vue'
+import ChapterFormDialog from '@/components/studio/ChapterFormDialog.vue'
 import CreateMovieTaskDialog from '@/components/video/CreateMovieTaskDialog.vue'
 
 import { useMovieWorkflow } from '@/composables/useMovieWorkflow'
+import chaptersService from '@/services/chapters'
 
 const route = useRoute()
 const router = useRouter()
@@ -274,7 +285,12 @@ const showSceneDialog = ref(false)
 const showShotDialog = ref(false)
 const showKeyframeDialog = ref(false)
 const showTransitionDialog = ref(false)
+const showChapterDialog = ref(false)
 const showMovieTaskDialog = ref(false)
+
+// Chapter management
+const editingChapter = ref(null)
+const chapterSelectorRef = ref(null)
 
 // Material check states
 const checkingMaterials = ref(false)
@@ -453,6 +469,34 @@ const handleCompositionSuccess = () => {
   ElMessage.success('电影合成任务已创建，可以在视频任务页面查看进度')
   // 可选：跳转到视频任务页面
   router.push({ name: 'GenerationPage' })
+}
+
+// Chapter management
+const handleChapterCreate = () => {
+  editingChapter.value = null
+  showChapterDialog.value = true
+}
+
+const handleChapterSubmit = async (chapterData) => {
+  try {
+    if (chapterData.id) {
+      // 编辑章节
+      await chaptersService.updateChapter(chapterData.id, chapterData)
+      ElMessage.success('章节更新成功')
+    } else {
+      // 创建章节
+      await chaptersService.createChapter(projectId.value, chapterData)
+      ElMessage.success('章节创建成功')
+    }
+    
+    // 刷新章节列表
+    if (chapterSelectorRef.value) {
+      await chapterSelectorRef.value.fetchChapters()
+    }
+  } catch (error) {
+    console.error('保存章节失败:', error)
+    ElMessage.error('保存章节失败')
+  }
 }
 
 // Watch projectId changes

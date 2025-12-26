@@ -2,6 +2,15 @@
   <div class="chapter-selector">
     <div class="selector-header">
       <h3>选择章节</h3>
+      <el-button
+        type="primary"
+        size="small"
+        :icon="Plus"
+        @click="$emit('create')"
+        style="width: 100%; margin-bottom: 10px;"
+      >
+        新增章节
+      </el-button>
       <el-input
         v-model="searchQuery"
         placeholder="搜索章节..."
@@ -52,7 +61,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { Search, Plus } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import chaptersService from '@/services/chapters'
 
@@ -61,7 +70,7 @@ const props = defineProps({
   projectId: String
 })
 
-const emit = defineEmits(['update:modelValue', 'select'])
+const emit = defineEmits(['update:modelValue', 'select', 'create'])
 
 const loading = ref(false)
 const chapters = ref([])
