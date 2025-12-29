@@ -878,7 +878,7 @@ const handleDelete = async (transition) => {
   color: #909399;
   line-height: 1.6;
   margin: 0;
-  max-height: 60px;
+  max-height: 150px;
   overflow-y: auto;
   font-family: monospace;
   background: #f5f7fa;
