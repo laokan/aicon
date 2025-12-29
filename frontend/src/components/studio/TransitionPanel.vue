@@ -65,6 +65,14 @@
                 刷新状态
               </el-button>
               <el-button
+                v-if="transition.video_url"
+                type="info"
+                size="small"
+                @click="handleShowHistory(transition)"
+              >
+                <el-icon><Clock /></el-icon>
+              </el-button>
+              <el-button
                 type="primary"
                 size="small"
                 @click="handleEditPrompt(transition)"
@@ -237,12 +245,24 @@
     >
       <el-form :model="editPromptFormData" label-width="100px">
         <el-form-item label="视频提示词">
+          <div class="prompt-editor-header">
+            <el-button
+              size="small"
+              type="primary"
+              :loading="regeneratingPrompt"
+              :disabled="regeneratingPrompt"
+              @click="handleRegeneratePrompt"
+            >
+              <el-icon><Refresh /></el-icon>
+              重新生成提示词
+            </el-button>
+          </div>
           <el-input
             v-model="editPromptFormData.prompt"
             type="textarea"
             :rows="12"
             placeholder="视频生成提示词"
-            style="font-family: monospace; font-size: 12px;"
+            style="font-family: monospace; font-size: 12px; margin-top: 8px;"
           />
           <div style="margin-top: 8px; color: #909399; font-size: 12px;">
             💡 提示词用于生成两个分镜之间的过渡视频。您可以根据需要调整。
@@ -326,14 +346,25 @@
         <video v-if="previewVideoUrl" :src="previewVideoUrl" controls autoplay style="width: 100%; max-height: 70vh;" />
       </div>
     </el-dialog>
+
+    <!-- 历史记录面板 -->
+    <GenerationHistoryPanel
+      v-model="showHistory"
+      resource-type="transition_video"
+      :resource-id="currentHistoryTransitionId"
+      media-type="video"
+      @selected="handleHistorySelected"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Loading, VideoCamera, CircleClose, Refresh, ZoomIn } from '@element-plus/icons-vue'
+import { Loading, VideoCamera, CircleClose, Refresh, ZoomIn, Clock } from '@element-plus/icons-vue'
 import { useTransitionWorkflow } from '@/composables/useTransitionWorkflow'
+import GenerationHistoryPanel from '@/components/GenerationHistoryPanel.vue'
+import { pollTaskStatus } from '@/utils/taskPoller'
 import api from '@/services/api'
 
 const props = defineProps({
@@ -396,6 +427,13 @@ const textModelOptions = ref([])
 const videoModelOptions = ref([])
 const loadingTextModels = ref(false)
 const loadingVideoModels = ref(false)
+
+// 历史记录相关
+const showHistory = ref(false)
+const currentHistoryTransitionId = ref('')
+
+// 重新生成提示词相关
+const regeneratingPrompt = ref(false)
 
 // 计算属性
 const canCreate = computed(() => {
@@ -646,6 +684,60 @@ const formatErrorMessage = (errorMsg) => {
   }
 }
 
+// 显示历史记录
+const handleShowHistory = (transition) => {
+  currentHistoryTransitionId.value = transition.id
+  showHistory.value = true
+}
+
+// 历史记录选择后的处理
+const handleHistorySelected = async (history) => {
+  ElMessage.success('已切换到选中的历史版本')
+  await loadTransitions(props.scriptId)
+}
+
+// 重新生成提示词
+const handleRegeneratePrompt = async () => {
+  if (!editPromptFormData.value.transitionId) {
+    ElMessage.error('未找到过渡ID')
+    return
+  }
+
+  if (!props.apiKeys || props.apiKeys.length === 0) {
+    ElMessage.error('请先配置API Key')
+    return
+  }
+
+  regeneratingPrompt.value = true
+
+  try {
+    const response = await api.post(
+      `/movie/transitions/${editPromptFormData.value.transitionId}/regenerate-prompt`,
+      {
+        api_key_id: props.apiKeys[0].id,
+        model: textModelOptions.value[0] || 'gpt-4'
+      }
+    )
+
+    const taskId = response.task_id
+    ElMessage.info('正在重新生成提示词...')
+
+    const result = await pollTaskStatus(taskId)
+
+    if (result.success) {
+      editPromptFormData.value.prompt = result.video_prompt
+      ElMessage.success('提示词已重新生成')
+    } else {
+      throw new Error(result.error || '生成失败')
+    }
+  } catch (error) {
+    console.error('重新生成提示词失败:', error)
+    ElMessage.error('重新生成失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    regeneratingPrompt.value = false
+  }
+}
+
 // 删除
 const handleDelete = async (transition) => {
   try {
@@ -839,6 +931,12 @@ const handleDelete = async (transition) => {
   align-items: center;
   background: #000;
   border-radius: 8px;
+}
+
+.prompt-editor-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
 }
 
 .transition-placeholder {

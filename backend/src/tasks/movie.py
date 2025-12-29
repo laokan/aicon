@@ -258,3 +258,62 @@ async def movie_generate_single_scene_image(db_session: AsyncSession, self, scen
     
     logger.info(f"Celery任务完成: movie_generate_single_scene_image")
     return {"scene_image_url": url}
+
+@celery_app.task(
+    bind=True,
+    max_retries=0,
+    name="movie.regenerate_transition_prompt"
+)
+@async_task_decorator
+async def movie_regenerate_transition_prompt(
+    db_session: AsyncSession, 
+    self, 
+    transition_id: str, 
+    api_key_id: str, 
+    model: str = None
+):
+    """重新生成过渡视频提示词的 Celery 任务"""
+    from src.services.transition_service import TransitionService
+    from src.models.movie import MovieShotTransition
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    
+    logger.info(f"Celery任务开始: movie_regenerate_transition_prompt (transition_id={transition_id})")
+    
+    # 加载过渡记录及关联的分镜
+    stmt = (
+        select(MovieShotTransition)
+        .where(MovieShotTransition.id == transition_id)
+        .options(
+            selectinload(MovieShotTransition.from_shot),
+            selectinload(MovieShotTransition.to_shot)
+        )
+    )
+    result = await db_session.execute(stmt)
+    transition = result.scalar_one_or_none()
+    
+    if not transition:
+        raise ValueError(f"过渡不存在: {transition_id}")
+    
+    if not transition.from_shot or not transition.to_shot:
+        raise ValueError(f"过渡缺少关联的分镜信息: {transition_id}")
+    
+    # 使用TransitionService重新生成提示词
+    service = TransitionService(db_session)
+    new_prompt = await service.generate_video_prompt(
+        transition.from_shot,
+        transition.to_shot,
+        api_key_id,
+        model
+    )
+    
+    # 更新提示词
+    transition.video_prompt = new_prompt
+    await db_session.commit()
+    
+    logger.info(f"Celery任务完成: movie_regenerate_transition_prompt, 新提示词长度: {len(new_prompt)}")
+    return {
+        "success": True,
+        "transition_id": str(transition_id),
+        "video_prompt": new_prompt
+    }

@@ -46,6 +46,7 @@
             @generate-avatar="handleGenerateAvatar"
             @delete-character="handleDeleteCharacter"
             @batch-generate="handleBatchGenerateAvatars"
+            @refresh="handleRefreshCharacters"
           />
 
           <!-- 步骤1: 场景提取 -->
@@ -80,6 +81,7 @@
             :batch-generating="sceneWorkflow.batchGenerating.value"
             @batch-generate="handleBatchGenerateSceneImages"
             @generate-scene-image="handleGenerateSceneImage"
+            @refresh="handleRefreshScenes"
           />
 
           <!-- 步骤4: 关键帧生成 -->
@@ -91,6 +93,7 @@
             :generating-ids="shotWorkflow.generatingKeyframes.value"
             @batch-generate="handleBatchGenerateKeyframes"
             @generate-keyframe="handleGenerateSingleKeyframe"
+            @refresh="handleRefreshKeyframes"
           />
 
           <!-- 步骤5: 过渡视频 -->
@@ -395,6 +398,20 @@ const handleGenerateTransitionVideos = async (apiKeyId, videoModel) => {
   await transitionWorkflow.generateTransitionVideos(sceneWorkflow.script.value.id, apiKeyId, videoModel)
   await loadData(true)  // skipStepUpdate=true 保持当前步骤
 }
+
+// Refresh handlers for history selection
+const handleRefreshCharacters = async () => {
+  await loadData(true)
+}
+
+const handleRefreshScenes = async () => {
+  await sceneWorkflow.loadScript(selectedChapterId.value)
+}
+
+const handleRefreshKeyframes = async () => {
+  await sceneWorkflow.loadScript(selectedChapterId.value)
+}
+
 
 // Material checking
 const handleCheckMaterials = async () => {

@@ -212,3 +212,29 @@ async def generate_single_transition_video(
     
     task = movie_generate_single_transition.delay(transition_id, req.api_key_id, req.video_model)
     return {"task_id": task.id, "message": "过渡视频生成任务已提交"}
+
+@router.post("/transitions/{transition_id}/regenerate-prompt", summary="重新生成视频提示词")
+async def regenerate_transition_prompt(
+    transition_id: str,
+    req: TransitionGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+):
+    """
+    重新生成过渡视频提示词（异步任务）
+    使用LLM根据前后分镜描述重新生成视频提示词
+    """
+    from src.tasks.movie import movie_regenerate_transition_prompt
+    
+    # 提交异步任务
+    task = movie_regenerate_transition_prompt.delay(
+        transition_id, 
+        req.api_key_id, 
+        req.model
+    )
+    
+    return {
+        "task_id": task.id, 
+        "message": "提示词重新生成任务已提交"
+    }
+

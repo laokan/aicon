@@ -77,6 +77,13 @@
               >
                 重新生成
               </el-button>
+              <el-button 
+                type="info" 
+                size="small"
+                @click="handleShowHistory(char.id)"
+              >
+                <el-icon><Clock /></el-icon>
+              </el-button>
             </template>
             <el-button 
               type="danger" 
@@ -145,13 +152,23 @@
       :url-list="[previewImageUrl]"
       @close="showImageViewer = false"
     />
+
+    <!-- 历史记录面板 -->
+    <GenerationHistoryPanel
+      v-model="showHistory"
+      resource-type="character_avatar"
+      :resource-id="currentHistoryResourceId"
+      media-type="image"
+      @selected="handleHistorySelected"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
-import { User, ZoomIn } from '@element-plus/icons-vue'
+import { User, ZoomIn, Clock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import GenerationHistoryPanel from '@/components/GenerationHistoryPanel.vue'
 import api from '@/services/api'
 
 const props = defineProps({
@@ -185,7 +202,8 @@ const emit = defineEmits([
   'extract-characters',
   'generate-avatar',
   'delete-character',
-  'batch-generate'
+  'batch-generate',
+  'refresh'
 ])
 
 const showDialog = ref(false)
@@ -209,6 +227,20 @@ const handleImagePreview = (url) => {
     previewImageUrl.value = url
     showImageViewer.value = true
   }
+}
+
+// 历史记录相关
+const showHistory = ref(false)
+const currentHistoryResourceId = ref('')
+
+const handleShowHistory = (characterId) => {
+  currentHistoryResourceId.value = characterId
+  showHistory.value = true
+}
+
+const handleHistorySelected = async (history) => {
+  ElMessage.success('已切换到选中的历史版本')
+  emit('refresh')
 }
 
 // 监听API Key变化，自动加载模型列表

@@ -46,6 +46,14 @@
               >
                 重新生成
               </el-button>
+              <el-button
+                v-if="scene.scene_image_url"
+                type="info"
+                size="small"
+                @click="handleShowHistory(scene.id)"
+              >
+                <el-icon><Clock /></el-icon>
+              </el-button>
             </div>
           </div>
           
@@ -196,13 +204,23 @@
       :url-list="[currentPreviewImage]"
       @close="showImageViewer = false"
     />
+
+    <!-- 历史记录面板 -->
+    <GenerationHistoryPanel
+      v-model="showHistory"
+      resource-type="scene_image"
+      :resource-id="currentHistoryResourceId"
+      media-type="image"
+      @selected="handleHistorySelected"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Picture, ZoomIn } from '@element-plus/icons-vue'
+import { Picture, ZoomIn, Clock } from '@element-plus/icons-vue'
+import GenerationHistoryPanel from '@/components/GenerationHistoryPanel.vue'
 import api from '@/services/api'
 
 const props = defineProps({
@@ -228,7 +246,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['batch-generate', 'generate-scene-image'])
+const emit = defineEmits(['batch-generate', 'generate-scene-image', 'refresh'])
 
 // 批量生成
 const showBatchDialog = ref(false)
@@ -254,6 +272,22 @@ const loadingSceneImageModels = ref(false)
 // 图片预览
 const showImageViewer = ref(false)
 const currentPreviewImage = ref('')
+
+// 历史记录相关
+const showHistory = ref(false)
+const currentHistoryResourceId = ref('')
+
+// 显示历史记录
+const handleShowHistory = (sceneId) => {
+  currentHistoryResourceId.value = sceneId
+  showHistory.value = true
+}
+
+// 历史记录选择后的处理
+const handleHistorySelected = async (history) => {
+  ElMessage.success('已切换到选中的历史版本')
+  emit('refresh')
+}
 
 // 监听批量生成API Key变化
 watch(() => batchFormData.value.apiKeyId, async (newKeyId) => {
