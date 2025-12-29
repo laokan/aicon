@@ -7,6 +7,26 @@
 [![Vue](https://img.shields.io/badge/vue-3.x-green.svg)](https://vuejs.org/)
 [![FastAPI](https://img.shields.io/badge/fastapi-latest-009688.svg)](https://fastapi.tiangolo.com/)
 
+## 🎥 成果展示
+
+**全自动AI电影生成演示** - 无需手动调整提示词和关键帧
+
+[![观看演示视频](https://img.shields.io/badge/🎬_观看演示-B站视频-00A1D6?style=for-the-badge&logo=bilibili)](https://www.bilibili.com/video/BV1i6vxB9ERD/)
+
+> **💡 重要说明**：
+> - 本演示视频展示的是**完全自动化**生成的结果
+> - 未对提示词进行深度调整，未手动优化关键帧
+> - 如果您了解电影摄影、镜头语言和提示词工程，可以获得**更专业的效果**
+> - 系统支持在每个环节手动调整提示词、选择历史版本，实现精细化控制
+
+**技术亮点**：
+- ✅ 从小说文本到完整电影的全流程自动化
+- ✅ 智能场景分析、分镜生成、角色一致性保持
+- ✅ 自动生成过渡视频，实现流畅的镜头衔接
+- ✅ 支持历史版本管理，可随时切换和对比不同生成结果
+
+---
+
 ## 🌟 核心亮点
 
 ### 🎥 AI电影工作室 - 重磅功能
