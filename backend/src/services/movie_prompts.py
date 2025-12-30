@@ -397,112 +397,141 @@ Generate a detailed, cinematic establishing shot that captures the environment w
         return cls.SCENE_IMAGE_FROM_SHOTS.format(shots_description=shots_description)
 
     # 过渡视频提示词生成Prompt
-    TRANSITION_VIDEO = """
-你是一名**国际获奖级电影视频提示词生成专家**，精通 **Google Veo 3.1** 的视频生成最佳实践。
+    TRANSITION_VIDEO = """你是一名精通 **Google Veo 3.1** 的电影级视频提示词生成专家。
 
 你的任务是：
-**根据给定的两个分镜描述，生成一个用于 AI 视频生成的【中文视频提示词】**，用于在**首帧与尾帧之间生成一个固定 8 秒的连续过渡视频**。
+**仅生成"当前分镜"的 8 秒视频内容。**
+
+⚠️ **重要上下文说明（不属于生成内容）：**
+
+* 前一个分镜已完整呈现，不得在本视频中重复、回放、延续或重新表现
+* 本视频 **必须从当前分镜的起始状态直接开始**
+* 前一个分镜的信息仅用于理解上下文连续性，绝对不能被生成到视频中
 
 ---
 
-### 【模型适配前提（必须遵守）】
+### 【前一个分镜（仅作上下文参考，禁止生成）】
 
-* 视频基于 **首帧 + 尾帧** 生成
-* 中间画面为模型进行的**连续视觉插值**
-* 模型只理解 **画面状态从 A 到 B 的变化**
-
-因此：
-
-* 只允许 **一个连续镜头**
-* 禁止剪辑、跳切、叙事跳跃
-* 所有关键变化必须在 **尾帧画面状态中成立**
+{previous_shot}
 
 ---
 
-### 【输出要求（强制）】
+### 【当前分镜（这是你要生成的内容）】
 
-* **只输出中文视频提示词本身**
-* 禁止任何解释、标题、标记、注释
-* 提示词需自然融合 **Veo 3.1 五部分公式**：
-
-  * **Cinematography**：镜头运动、构图、焦距
-  * **Subject**：角色或视觉焦点（与分镜严格一致）
-  * **Action**：8 秒内可完成的连续动作
-  * **Context**：环境与空间
-  * **Style & Ambiance**：光线、情绪、美学
+{current_shot}
 
 ---
 
-### 【摄影语言约束】
+### 【核心硬性约束】
 
-* 单一连续镜头（no cuts）
-* 允许镜头运动：dolly shot, tracking shot, slow pan, push in, pull back, arc shot
-* 明确景别：wide shot, medium shot, close-up, extreme close-up
-* 明确焦距：shallow depth of field, deep focus, rack focus
-
----
-
-### 【音频规则（极其重要）】
-
-* **严格禁止任何背景音乐**
-* 禁止 BGM、配乐、旋律、节奏音乐
-* 只允许真实声音：
-
-**物理音效**（必须使用前缀）
-`SFX: footsteps, fabric rustling, breathing, object handling`
-
-**环境音**（必须使用前缀）
-`Ambient noise: room tone, wind, distant traffic`
-
-* 必须明确写出：
-  **NO background music, NO BGM, NO soundtrack**
+* 时长固定：**8 秒**
+* **单一连续镜头**（no cuts, no transitions）
+* 不得出现前一分镜中的具体动作、物体或细节
+* 不得回看、回溯、延迟进入状态
+* 不得引入新角色、新道具、新场景
+* 所有变化在尾帧画面中必须成立
 
 ---
 
-### 【角色名称保护】
+### 【输出结构（严格遵守）】
 
-* 所有角色名称必须与输入 **完全一致**
-* 不允许翻译、音译或修改
-* 中文名必须原样保留
+只输出以下五个部分，不要任何解释文字。
 
 ---
 
-### 【风格要求】
+### [Cinematography] 摄影与镜头
 
-* 强调 **live-action realism**
-* cinematic, realistic, filmic
-* 情绪通过 **可见动作与最终画面状态**体现，禁止抽象情绪描述
-
----
-
-### 【生成重点】
-
-* 明确从 **第一个分镜画面状态** 开始
-* 通过平滑连续运动
-* 自然过渡到 **第二个分镜画面状态**
-* 禁止引入新角色、新道具、新场景
+描述镜头类型、运动方式、景别、焦距、构图。
+* 镜头运动：dolly shot, tracking shot, slow pan, push in, pull back, arc shot, handheld, steadicam
+* 景别：wide shot, medium shot, close-up, extreme close-up, over-the-shoulder
+* 焦距：shallow depth of field, deep focus, rack focus
+* 构图：rule of thirds, centered framing, leading lines, symmetrical composition
+* **单一连续镜头，无剪辑、无转场**
 
 ---
 
-### 【两个分镜的描述】
+### [Subject] 主体状态
 
-{combined_text}
+列出所有角色（名称必须与输入完全一致），描述：
+* 起始状态：简要概括（不超过1句话）
+* 结束状态：简要概括（不超过1句话）
+
+**注意：不要复述前一分镜的细节，只描述当前分镜的状态变化**
 
 ---
+
+### [Action] 8 秒连续动作（唯一时间轴）
+
+* **0–2 秒**：起始动作或静态建立（用自己的语言简述首帧状态）
+* **2–6 秒**：核心动作展开（重点描述过渡过程中的动作变化）
+* **6–8 秒**：动作完成与画面稳定（用自己的语言简述尾帧状态）
+
+**如果当前分镜中有对话，必须在适当时间点自然融入。**
+
+**对话语言判断规则：**
+* 中文名角色（如：李明、梅露希亚）→ 对话使用中文
+* 英文名角色（如：Marcus Thorne、Leo）→ 对话使用英文
+* 根据场景语境判断，无法判断时默认使用中文
+
+**对话格式：**
+* 使用引号包裹对话内容
+* 在对话前简要说明说话者和语气
+* 例如：`马库斯·索恩 (Marcus Thorne) 用低沉嘶哑的声音说："Don't look at it, kid."`
+
+---
+
+### [Context] 环境与声音
+
+描述场景位置、光线、时间、天气、环境音效。
+
+**音频规则（极其重要）：**
+* ❌ 严格禁止任何背景音乐（NO background music, NO BGM, NO soundtrack, NO score）
+* ✅ 只允许真实环境声音：
+  - **物理音效**（使用前缀）：`SFX: footsteps on wooden floor, fabric rustling, heavy breathing, door creaking, glass breaking, metal clanging`
+  - **环境音**（使用前缀）：`Ambient noise: room tone, wind through trees, distant traffic, rain on windows, crowd murmur`
+  - **对话音**（如有）：`Dialogue: clear speech, natural voice`
+
+---
+
+### [Style & Ambiance] 风格与氛围
+
+描述视觉风格、色调、情绪氛围。
+* 视觉风格：live-action realism, cinematic, photorealistic, filmic
+* 色调：warm tones, cool tones, high contrast, muted colors, vibrant palette
+* 情绪氛围（通过可见画面状态体现，禁止抽象描述）
+
+---
+
+**必须在末尾声明：**
+NO background music, NO BGM, NO soundtrack, only natural sound effects and ambient noise.
+
+---
+
+### 【生成检查清单】
+
+- [ ] 是否只生成了当前分镜的内容？
+- [ ] 是否避免了重复前一分镜的具体细节？
+- [ ] 如果有对话，是否已包含在 [Action] 部分？
+- [ ] 对话语言是否根据角色名称正确判断？
+- [ ] 是否声明了禁止背景音乐？
+
+**请严格按照上述要求，生成一个完整的8秒视频中文提示词。只输出提示词本身，不要有任何额外说明。**
 """
 
+
     @classmethod
-    def get_transition_video_prompt(cls, combined_text: str) -> str:
+    def get_transition_video_prompt(cls, previous_shot: str, current_shot: str) -> str:
         """
         获取过渡视频提示词生成Prompt
         
         Args:
-            combined_text: 组合的两个分镜描述
+            previous_shot: 前一个分镜描述（仅作上下文参考）
+            current_shot: 当前分镜描述（要生成的内容）
             
         Returns:
             str: 格式化后的prompt
         """
-        return cls.TRANSITION_VIDEO.format(combined_text=combined_text)
+        return cls.TRANSITION_VIDEO.format(previous_shot=previous_shot, current_shot=current_shot)
 
 
 __all__ = ["MoviePromptTemplates"]

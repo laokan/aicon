@@ -63,18 +63,25 @@ class TransitionService(BaseService):
 
         from src.services.movie_prompts import MoviePromptTemplates
 
-        combined_text = f"""分镜1:
+        # 格式化前一个分镜描述（仅作上下文参考）
+        previous_shot = f"""**分镜描述：**
 {from_shot_description}
-对话: {from_shot_dialogue}
-角色: {', '.join(from_shot_characters) if from_shot_characters else '无'}
 
-分镜2:
-{to_shot_description}
-对话: {to_shot_dialogue}
-角色: {', '.join(to_shot_characters) if to_shot_characters else '无'}
+**对话：** {from_shot_dialogue}
+
+**角色：** {', '.join(from_shot_characters) if from_shot_characters else '无'}
 """
 
-        prompt = MoviePromptTemplates.get_transition_video_prompt(combined_text)
+        # 格式化当前分镜描述（要生成的内容）
+        current_shot = f"""**分镜描述：**
+{to_shot_description}
+
+**对话：** {to_shot_dialogue}
+
+**角色：** {', '.join(to_shot_characters) if to_shot_characters else '无'}
+"""
+
+        prompt = MoviePromptTemplates.get_transition_video_prompt(previous_shot, current_shot)
 
         response = await llm_provider.completions(
             model=model,
