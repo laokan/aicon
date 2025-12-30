@@ -2,7 +2,7 @@
 
 > 🎬 **AI驱动的智能内容创作与分发平台** - 从文字到视频，一站式AI内容生产解决方案
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Vue](https://img.shields.io/badge/vue-3.x-green.svg)](https://vuejs.org/)
 [![FastAPI](https://img.shields.io/badge/fastapi-latest-009688.svg)](https://fastapi.tiangolo.com/)
@@ -318,7 +318,21 @@ DEBUG=true
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+本项目采用 Apache License 2.0 许可证 - 详见 [LICENSE](LICENSE) 文件
+
+### 关于 Apache 2.0
+
+Apache License 2.0 是一个宽松的开源许可证，允许您：
+- ✅ 自由使用、修改和分发本软件
+- ✅ 用于商业目的
+- ✅ 获得专利授权保护
+
+但需要：
+- 📋 保留版权声明和许可证声明
+- 📝 标注对原始代码的修改
+- 🚫 不得使用项目名称或贡献者名字做推广
+
+详细条款请参阅 [LICENSE](LICENSE) 文件。
 
 ## 🙏 致谢
 
