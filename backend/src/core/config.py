@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     # =============================================================================
     # 应用基础配置
     # =============================================================================
+    APP_NAME: str = "AICG Platform"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"
@@ -64,7 +65,7 @@ class Settings(BaseSettings):
         env="JWT_SECRET_KEY"
     )
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7天 (7 * 24 * 60)
 
     # =============================================================================
     # 加密配置
@@ -78,6 +79,7 @@ class Settings(BaseSettings):
     # MinIO对象存储配置
     # =============================================================================
     MINIO_ENDPOINT: str = Field(default="localhost:9000", env="MINIO_ENDPOINT")
+    MINIO_PUBLIC_URL: Optional[str] = Field(default=None, env="MINIO_PUBLIC_URL")
     MINIO_ACCESS_KEY: str = Field(default="minioadmin", env="MINIO_ACCESS_KEY")
     MINIO_SECRET_KEY: str = Field(default="minioadmin", env="MINIO_SECRET_KEY")
     MINIO_SECURE: bool = False

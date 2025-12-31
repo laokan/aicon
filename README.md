@@ -140,7 +140,70 @@ aicon2/
 
 ## 🚀 快速开始
 
-### 环境要求
+### 推荐方式: Docker部署 (一键启动)
+
+使用Docker是最简单、最快速的部署方式,无需手动配置各种依赖。
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/869413421/aicon.git
+cd aicon
+
+# 2. 配置环境变量
+cp .env.production.example .env.production
+# 编辑 .env.production,修改以下必要配置:
+# - POSTGRES_PASSWORD (数据库密码)
+# - REDIS_PASSWORD (Redis密码)
+# - MINIO_ROOT_PASSWORD (MinIO密码)
+# - JWT_SECRET_KEY (JWT密钥)
+# - API_KEY_ENCRYPTION_KEY (API密钥加密密钥)
+
+# 3. 启动所有服务 (一键启动)
+docker-compose -f docker-compose.prod.yml up -d
+
+# 4. 查看服务状态
+docker-compose -f docker-compose.prod.yml ps
+
+# 5. 访问应用
+# 前端: http://localhost
+# 后端API: http://localhost:8000
+# API文档: http://localhost:8000/docs
+# MinIO控制台: http://localhost:9001
+```
+
+**服务说明:**
+- ✅ 前端 (Vue3 + Nginx)
+- ✅ 后端 (FastAPI)
+- ✅ Celery Worker (异步任务)
+- ✅ Celery Beat (定时任务)
+- ✅ PostgreSQL (数据库)
+- ✅ Redis (缓存和消息队列)
+- ✅ MinIO (对象存储)
+
+**查看日志:**
+```bash
+# 查看所有服务日志
+docker-compose -f docker-compose.prod.yml logs -f
+
+# 查看特定服务日志
+docker-compose -f docker-compose.prod.yml logs -f backend
+docker-compose -f docker-compose.prod.yml logs -f celery-worker
+```
+
+**停止服务:**
+```bash
+docker-compose -f docker-compose.prod.yml down
+```
+
+📖 **详细部署文档**: 查看 [Docker部署指南](docs/docker-deployment-guide.md)
+
+---
+
+### 方式二: 本地开发环境
+
+适合开发调试,需要手动配置各种依赖。
+
+#### 环境要求
 
 - Python 3.12+
 - Node.js 18+
@@ -148,7 +211,7 @@ aicon2/
 - Redis 6+
 - MinIO (或其他S3兼容存储)
 
-### 后端启动
+#### 后端启动
 
 ```bash
 cd backend
@@ -158,7 +221,7 @@ uv sync
 
 # 配置环境变量
 cp .env.example .env
-# 编辑 .env 文件，配置数据库、Redis、MinIO等
+# 编辑 .env 文件,配置数据库、Redis、MinIO等
 
 # 运行数据库迁移
 uv run alembic upgrade head
@@ -169,11 +232,11 @@ uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 # 启动Celery Worker（新终端）
 uv run celery -A src.tasks.app worker --loglevel=info
 
-# 启动Celery Worker 定时任务（新终端）
+# 启动Celery Beat 定时任务（新终端）
 uv run celery -A src.tasks.app beat --loglevel=info
 ```
 
-### 前端启动
+#### 前端启动
 
 ```bash
 cd frontend
@@ -186,6 +249,15 @@ npm run dev
 ```
 
 访问 `http://localhost:3000` 即可使用系统。
+
+#### 基础设施服务 (本地开发需要)
+
+如果使用本地开发方式,需要先启动基础设施服务:
+
+```bash
+# 启动 PostgreSQL, Redis, MinIO
+docker-compose up -d
+```
 
 ## 🎯 主要功能模块
 

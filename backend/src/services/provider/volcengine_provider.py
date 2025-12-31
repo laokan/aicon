@@ -24,7 +24,8 @@ class VolcengineProvider(BaseLLMProvider):
         # 关键：使用 OpenAI SDK，设置 base_url
         self.client = AsyncOpenAI(
             api_key=api_key,
-            base_url="https://ark.cn-beijing.volces.com/api/v3"
+            base_url="https://ark.cn-beijing.volces.com/api/v3",
+            timeout=300.0  # 5分钟超时
         )
         self.semaphore = asyncio.Semaphore(max_concurrency)
 

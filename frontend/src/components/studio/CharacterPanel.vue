@@ -309,14 +309,34 @@ const handleRegenerateClick = (char) => {
   showDialog.value = true
 }
 
-const handleBatchGenerateClick = () => {
+const handleBatchGenerateClick = async () => {
   dialogType.value = 'batch'
   dialogTitle.value = '批量生成角色形象'
+  const defaultApiKey = props.apiKeys[0]?.id || ''
   formData.value = {
-    apiKeyId: props.apiKeys[0]?.id || '',
+    apiKeyId: defaultApiKey,
     model: '',
     prompt: ''
   }
+  
+  // 强制重新加载图片模型列表
+  if (defaultApiKey) {
+    loadingModels.value = true
+    try {
+      const models = await api.get(`/api-keys/${defaultApiKey}/models?type=image`)
+      modelOptions.value = models || []
+      if (modelOptions.value.length > 0) {
+        formData.value.model = modelOptions.value[0]
+      }
+    } catch (error) {
+      console.error('获取模型列表失败', error)
+      ElMessage.warning('获取模型列表失败')
+      modelOptions.value = []
+    } finally {
+      loadingModels.value = false
+    }
+  }
+  
   showDialog.value = true
 }
 

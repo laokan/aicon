@@ -15,16 +15,14 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装 uv (快速Python包管理器)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:$PATH"
-
 # 复制依赖文件
 COPY pyproject.toml ./
 COPY uv.lock* ./
+COPY README.md ./
 
-# 使用uv安装依赖到虚拟环境
-RUN uv sync --frozen --no-dev
+# 安装 uv 并使用它安装 Python 依赖 (在同一个 RUN 中执行)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    /root/.local/bin/uv sync --frozen --no-dev
 
 # ============================================
 # Stage 2: Runtime - 运行阶段
@@ -47,6 +45,7 @@ RUN apt-get update && apt-get install -y \
     libavutil-dev \
     libswscale-dev \
     libswresample-dev \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建非root用户

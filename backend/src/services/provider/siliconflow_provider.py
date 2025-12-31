@@ -23,9 +23,14 @@ class SiliconFlowProvider(BaseLLMProvider):
     """
 
     def __init__(self, api_key: str, max_concurrency: int = 5, base_url: str = "https://api.siliconflow.cn/v1"):
+        # 规范化 base_url: 确保以斜杠结尾
+        if not base_url.endswith('/'):
+            base_url = base_url + '/'
+        
         self.client = AsyncOpenAI(
             api_key=api_key,
-            base_url=base_url
+            base_url=base_url,
+            timeout=300.0  # 5分钟超时
         )
         self.semaphore = asyncio.Semaphore(max_concurrency)
 

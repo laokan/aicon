@@ -18,7 +18,8 @@ class DeepSeekProvider(BaseLLMProvider):
     def __init__(self, api_key: str, max_concurrency: int = 5):
         self.client = AsyncOpenAI(
             api_key=api_key,
-            base_url="https://api.deepseek.com"
+            base_url="https://api.deepseek.com",
+            timeout=300.0  # 5分钟超时
         )
         self.semaphore = asyncio.Semaphore(max_concurrency)
 

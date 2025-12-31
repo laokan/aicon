@@ -11,7 +11,7 @@ services:
   # PostgreSQL 数据库
   postgres:
     image: postgres:15-alpine
-    container_name: aicg-postgres
+    container_name: aicon-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-aicg_platform}
@@ -23,7 +23,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - aicg-network
+      - aicon-network
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aicg_user} -d ${POSTGRES_DB:-aicg_platform}" ]
       interval: 10s
@@ -33,7 +33,7 @@ services:
   # Redis 缓存和消息队列
   redis:
     image: redis:7-alpine
-    container_name: aicg-redis
+    container_name: aicon-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password}
     ports:
@@ -41,7 +41,7 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - aicg-network
+      - aicon-network
     healthcheck:
       test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
       interval: 10s
@@ -51,7 +51,7 @@ services:
   # MinIO 对象存储
   minio:
     image: minio/minio:latest
-    container_name: aicg-minio
+    container_name: aicon-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -63,7 +63,7 @@ services:
     volumes:
       - minio_data:/data
     networks:
-      - aicg-network
+      - aicon-network
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 30s
@@ -76,10 +76,8 @@ services:
 
   # 后端 API 服务
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: aicg-backend
+    image: qingshui869413421/aicon-backend:latest
+    container_name: aicon-backend
     restart: unless-stopped
     environment:
       # 数据库配置
@@ -87,6 +85,8 @@ services:
 
       # Redis配置
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
 
       # MinIO配置
       MINIO_ENDPOINT: minio:9000
@@ -97,12 +97,10 @@ services:
 
       # 应用配置
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:-zWpJNO3LF7RpaOvkpOG-edszCEQVWe24dcent10bSrY=}
       DEBUG: ${DEBUG:-false}
       ENVIRONMENT: production
-
-      # AI服务配置 (从.env读取)
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-localhost:9000}
 
     ports:
       - "${BACKEND_PORT:-8000}:8000"
@@ -114,8 +112,9 @@ services:
       minio:
         condition: service_healthy
     networks:
-      - aicg-network
+      - aicon-network
     volumes:
+      - ./backend/src:/app/src # 挂载源代码，支持热重载
       - ./backend/logs:/app/logs
     command: >
       sh -c "
@@ -125,75 +124,77 @@ services:
 
   # Celery Worker - 异步任务处理
   celery-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: aicg-celery-worker
+    image: qingshui869413421/aicon-backend:latest
+    container_name: aicon-celery-worker
     restart: unless-stopped
     environment:
       # 使用与backend相同的环境变量
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aicg_user}:${POSTGRES_PASSWORD:-aicg_password}@postgres:5432/${POSTGRES_DB:-aicg_platform}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       MINIO_BUCKET: ${MINIO_BUCKET:-aicg-platform}
       MINIO_SECURE: "false"
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:-zWpJNO3LF7RpaOvkpOG-edszCEQVWe24dcent10bSrY=}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-localhost:9000}
     depends_on:
       - backend
       - redis
     networks:
-      - aicg-network
+      - aicon-network
     volumes:
+      - ./backend/src:/app/src # 挂载源代码，支持热重载
       - ./backend/logs:/app/logs
     command: celery -A src.tasks.app worker --loglevel=info --concurrency=4
 
   # Celery Beat - 定时任务调度
   celery-beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: aicg-celery-beat
+    image: qingshui869413421/aicon-backend:latest
+    container_name: aicon-celery-beat
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aicg_user}:${POSTGRES_PASSWORD:-aicg_password}@postgres:5432/${POSTGRES_DB:-aicg_platform}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:-zWpJNO3LF7RpaOvkpOG-edszCEQVWe24dcent10bSrY=}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-localhost:9000}
     depends_on:
       - backend
       - redis
     networks:
-      - aicg-network
+      - aicon-network
     volumes:
+      - ./backend/src:/app/src # 挂载源代码，支持热重载
       - ./backend/logs:/app/logs
     command: celery -A src.tasks.app beat --loglevel=info
 
   # 前端服务
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: aicg-frontend
+    image: qingshui869413421/aicon-frontend:latest
+    container_name: aicon-frontend
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-80}:80"
     depends_on:
       - backend
     networks:
-      - aicg-network
+      - aicon-network
 
 # ==========================================
 # 网络配置
 # ==========================================
 networks:
-  aicg-network:
+  aicon-network:
     driver: bridge
     ipam:
       config:
-        - subnet: 192.168.222.0/24
+        - subnet: 192.168.223.0/24
 
 # ==========================================
 # 数据卷配置

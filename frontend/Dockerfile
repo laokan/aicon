@@ -6,11 +6,14 @@ FROM node:18-alpine AS builder
 # 设置工作目录
 WORKDIR /app
 
+# 安装构建依赖 (用于编译原生模块)
+RUN apk add --no-cache python3 make g++
+
 # 复制package文件
 COPY package*.json ./
 
-# 安装依赖
-RUN npm ci --only=production
+# 安装所有依赖 (包括devDependencies,构建时需要)
+RUN npm ci
 
 # 复制源代码
 COPY . .

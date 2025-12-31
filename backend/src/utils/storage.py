@@ -32,6 +32,7 @@ class MinIOStorage:
             access_key=settings.MINIO_ACCESS_KEY,
             secret_key=settings.MINIO_SECRET_KEY,
             secure=settings.MINIO_SECURE,
+            region=settings.MINIO_REGION,
         )
         self.bucket_name = settings.MINIO_BUCKET_NAME
 
@@ -232,21 +233,50 @@ class MinIOStorage:
     ) -> str:
         """
         获取预签名URL
-
-        Args:
-            object_key: 对象键
-            expires: 过期时间
-
-        Returns:
-            预签名URL
         """
         try:
-            url = self.client.presigned_get_object(
+            # 默认使用内部客户端
+            signing_client = self.client
+            
+            # 如果配置了公开访问 URL
+            if settings.MINIO_PUBLIC_URL:
+                public_url = settings.MINIO_PUBLIC_URL
+                clean_endpoint = public_url.replace("http://", "").replace("https://", "").rstrip('/')
+                is_secure = public_url.startswith("https://") or settings.MINIO_SECURE
+                
+                try:
+                    # 强行指定 region 可以防止 SDK 尝试连接网络获取 location
+                    signing_client = Minio(
+                        endpoint=clean_endpoint,
+                        access_key=settings.MINIO_ACCESS_KEY,
+                        secret_key=settings.MINIO_SECRET_KEY,
+                        secure=is_secure,
+                        region=settings.MINIO_REGION,
+                    )
+                    
+                    return signing_client.presigned_get_object(
+                        bucket_name=self.bucket_name,
+                        object_name=object_key,
+                        expires=expires,
+                    )
+                except Exception as e:
+                    # 如果创建客户端或签名过程中报错（如因为 localhost 导致的连接重试）
+                    # 则回退到字符串替换逻辑，虽然可能会报 403，但至少不会让后端 API 500 崩溃
+                    logger.warning(f"使用公开域名签名失败，尝试字符串替换回退: {e}")
+                    url = self.client.presigned_get_object(
+                        bucket_name=self.bucket_name,
+                        object_name=object_key,
+                        expires=expires,
+                    )
+                    # 将内部 endpoint 替换为外部 endpoint
+                    return url.replace(settings.MINIO_ENDPOINT, clean_endpoint)
+            
+            # 正常产生内部 URL
+            return self.client.presigned_get_object(
                 bucket_name=self.bucket_name,
                 object_name=object_key,
                 expires=expires,
             )
-            return url
         except S3Error as e:
             logger.error(f"获取预签名URL失败: {e}")
             raise StorageError(f"获取预签名URL失败: {str(e)}")
