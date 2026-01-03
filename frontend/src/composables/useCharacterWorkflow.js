@@ -50,14 +50,15 @@ export function useCharacterWorkflow(projectId) {
         }
     }
 
-    const generateAvatar = async (characterId, apiKeyId, model, prompt, style) => {
+    const generateAvatar = async (characterId, apiKeyId, model, prompt, style, selectedReferenceIndices = []) => {
         generatingIds.value.add(characterId) // 添加到Set
         try {
             const response = await movieService.generateCharacterAvatar(characterId, {
                 api_key_id: apiKeyId,
                 model,
                 prompt,
-                style
+                style,
+                selected_reference_indices: selectedReferenceIndices
             })
 
             if (response.task_id) {

@@ -324,8 +324,8 @@ const handleExtractCharacters = async (apiKeyId, model) => {
   await loadData()
 }
 
-const handleGenerateAvatar = async (characterId, apiKeyId, model, prompt, style) => {
-  await characterWorkflow.generateAvatar(characterId, apiKeyId, model, prompt, style)
+const handleGenerateAvatar = async (characterId, apiKeyId, model, prompt, style, selectedReferenceIndices = []) => {
+  await characterWorkflow.generateAvatar(characterId, apiKeyId, model, prompt, style, selectedReferenceIndices)
 }
 
 const handleDeleteCharacter = async (characterId) => {

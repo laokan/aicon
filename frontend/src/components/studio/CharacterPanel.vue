@@ -47,6 +47,40 @@
             <p class="traits">{{ char.visual_traits }}</p>
           </div>
 
+          <!-- 参考图画廊 -->
+          <div class="reference-gallery">
+            <div class="gallery-header">
+              <span v-if="char.reference_images && char.reference_images.length > 0">参考图 ({{ char.reference_images.length }})</span>
+              <span v-else>参考图</span>
+              <el-upload
+                class="upload-btn-inline"
+                :auto-upload="false"
+                :show-file-list="false"
+                accept="image/*"
+                :on-change="(file) => handleUploadReferenceImage(char.id, file)"
+              >
+                <el-button type="primary" size="small" icon="Plus" circle />
+              </el-upload>
+            </div>
+            <div v-if="char.reference_images && char.reference_images.length > 0" class="gallery-images">
+              <div 
+                v-for="(imgUrl, index) in char.reference_images" 
+                :key="index"
+                class="gallery-item"
+              >
+                <img :src="imgUrl" :alt="`参考图${index + 1}`" @click="handleImagePreview(imgUrl)" />
+                <el-button
+                  class="delete-btn"
+                  type="danger"
+                  size="small"
+                  icon="Delete"
+                  circle
+                  @click.stop="handleDeleteReferenceImage(char.id, index)"
+                />
+              </div>
+            </div>
+          </div>
+
           <div class="character-actions">
             <el-button 
               v-if="!char.avatar_url"
@@ -139,6 +173,31 @@
             placeholder="可选，留空使用默认提示词"
           />
         </el-form-item>
+        <el-form-item v-if="dialogType === 'generate' || dialogType === 'regenerate'" label="参考图">
+          <div class="reference-image-section">
+            <div v-if="currentCharacter && currentCharacter.reference_images && currentCharacter.reference_images.length > 0" class="existing-references">
+              <div class="section-label">选择参考图（最多3张）:</div>
+              <div class="reference-options">
+                <div 
+                  v-for="(imgUrl, index) in currentCharacter.reference_images" 
+                  :key="index"
+                  class="reference-option"
+                  :class="{ selected: formData.selectedReferenceIndices?.includes(index) }"
+                  @click="toggleReferenceSelection(index)"
+                >
+                  <img :src="imgUrl" :alt="`参考图${index + 1}`" />
+                  <el-icon v-if="formData.selectedReferenceIndices?.includes(index)" class="check-icon"><Check /></el-icon>
+                  <div v-if="formData.selectedReferenceIndices?.includes(index)" class="selection-badge">
+                    {{ formData.selectedReferenceIndices.indexOf(index) + 1 }}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="no-references">
+              <el-empty description="暂无参考图，请在角色卡片上上传" :image-size="60" />
+            </div>
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
@@ -166,10 +225,11 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { User, ZoomIn, Clock } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { User, ZoomIn, Clock, Check, Delete } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import GenerationHistoryPanel from '@/components/GenerationHistoryPanel.vue'
 import api from '@/services/api'
+import movieService from '@/services/movie'
 
 const props = defineProps({
   characters: {
@@ -213,7 +273,8 @@ const currentCharacter = ref(null)
 const formData = ref({
   apiKeyId: '',
   model: '',
-  prompt: ''
+  prompt: '',
+  selectedReferenceIndices: []
 })
 const modelOptions = ref([])
 const loadingModels = ref(false)
@@ -280,7 +341,8 @@ const handleExtractClick = () => {
   formData.value = {
     apiKeyId: props.apiKeys[0]?.id || '',
     model: '',
-    prompt: ''
+    prompt: '',
+    selectedReferenceIndices: []
   }
   showDialog.value = true
 }
@@ -292,7 +354,8 @@ const handleGenerateClick = (char) => {
   formData.value = {
     apiKeyId: props.apiKeys[0]?.id || '',
     model: '',
-    prompt: char.generated_prompt || ''  // 预填充角色的三视图提示词
+    prompt: char.generated_prompt || '',
+    selectedReferenceIndices: []
   }
   showDialog.value = true
 }
@@ -304,7 +367,10 @@ const handleRegenerateClick = (char) => {
   formData.value = {
     apiKeyId: props.apiKeys[0]?.id || '',
     model: '',
-    prompt: char.generated_prompt || ''  // 预填充角色的三视图提示词
+    prompt: char.generated_prompt || '',  // 预填充角色的三视图提示词
+    referenceImage: null,
+    referenceImagePreview: null,
+    selectedReferenceIndex: null
   }
   showDialog.value = true
 }
@@ -316,7 +382,8 @@ const handleBatchGenerateClick = async () => {
   formData.value = {
     apiKeyId: defaultApiKey,
     model: '',
-    prompt: ''
+    prompt: '',
+    selectedReferenceIndices: []
   }
   
   // 强制重新加载图片模型列表
@@ -348,18 +415,74 @@ const handleDialogConfirm = () => {
   if (dialogType.value === 'extract') {
     emit('extract-characters', formData.value.apiKeyId, formData.value.model)
   } else if (dialogType.value === 'generate' || dialogType.value === 'regenerate') {
+    // 传递选中的参考图索引
     emit('generate-avatar', 
       currentCharacter.value.id,
       formData.value.apiKeyId,
       formData.value.model,
       formData.value.prompt,
-      null
+      null,
+      formData.value.selectedReferenceIndices
     )
   } else if (dialogType.value === 'batch') {
     emit('batch-generate', formData.value.apiKeyId, formData.value.model)
   }
 
   showDialog.value = false
+}
+
+// 切换参考图选择（最多3张）
+const toggleReferenceSelection = (index) => {
+  if (!formData.value.selectedReferenceIndices) {
+    formData.value.selectedReferenceIndices = []
+  }
+  
+  const currentIndex = formData.value.selectedReferenceIndices.indexOf(index)
+  
+  if (currentIndex > -1) {
+    // 已选中，取消选择
+    formData.value.selectedReferenceIndices.splice(currentIndex, 1)
+  } else {
+    // 未选中，添加选择
+    if (formData.value.selectedReferenceIndices.length >= 3) {
+      ElMessage.warning('最多只能选择3张参考图')
+      return
+    }
+    formData.value.selectedReferenceIndices.push(index)
+  }
+}
+
+// 上传参考图
+const handleUploadReferenceImage = async (characterId, file) => {
+  try {
+    await movieService.uploadReferenceImage(characterId, file.raw)
+    ElMessage.success('参考图上传成功')
+    
+    // 重新加载角色列表
+    emit('refresh')
+  } catch (error) {
+    console.error('上传参考图失败:', error)
+    ElMessage.error('上传参考图失败')
+  }
+}
+
+// 删除参考图
+const handleDeleteReferenceImage = async (characterId, imageIndex) => {
+  try {
+    await ElMessageBox.confirm('确定要删除这张参考图吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    await api.delete(`/movie/characters/${characterId}/reference-images/${imageIndex}`)
+    ElMessage.success('参考图已删除')
+    emit('refresh')
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除参考图失败')
+    }
+  }
 }
 </script>
 
@@ -490,5 +613,244 @@ const handleDialogConfirm = () => {
 .character-actions .el-button {
   flex: 1;
   min-width: 80px;
+}
+
+/* 参考图画廊 */
+.reference-gallery {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+}
+
+.gallery-header {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+
+.gallery-images {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gallery-item {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.gallery-item:hover {
+  transform: scale(1.05);
+}
+
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gallery-item .delete-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  min-height: 20px;
+}
+
+.gallery-item:hover .delete-btn {
+  opacity: 1;
+}
+
+/* 参考图上传区域 */
+.reference-image-section {
+  width: 100%;
+}
+
+.section-label {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.existing-references {
+  margin-bottom: 16px;
+}
+
+.reference-options {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.reference-option {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border: 2px solid #dcdfe6;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.reference-option:hover {
+  border-color: #409eff;
+  transform: scale(1.05);
+}
+
+.reference-option.selected {
+  border-color: #409eff;
+  box-shadow: 0 0 8px rgba(64, 158, 255, 0.3);
+}
+
+.reference-option img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reference-option .check-icon {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: #409eff;
+  color: white;
+  border-radius: 50%;
+  padding: 2px;
+  font-size: 14px;
+}
+
+.reference-option .selection-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: #409eff;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.upload-new-reference {
+  margin-top: 12px;
+}
+
+.upload-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reference-uploader {
+  width: 100%;
+}
+
+.uploaded-previews {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.preview-item {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border: 2px solid #dcdfe6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-item .preview-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: #409eff;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.preview-item .remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  min-height: 24px;
+}
+
+.image-preview {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  border: 1px dashed #d9d9d9;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-preview .clear-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.upload-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 8px;
+}
+
+.gallery-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.upload-btn-inline {
+  display: inline-block;
+}
+
+.upload-btn-inline .el-button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
 }
 </style>

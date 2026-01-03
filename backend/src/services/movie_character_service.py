@@ -303,7 +303,15 @@ class MovieCharacterService(BaseService):
             logger.error(f"提取角色失败: {e}")
             raise
     
-    async def generate_character_avatar(self, character_id: str, api_key_id: str, model: str = None, prompt: str = None, style: str = "cinematic") -> str:
+    async def generate_character_avatar(
+        self, 
+        character_id: str, 
+        api_key_id: str, 
+        model: str = None, 
+        prompt: str = None, 
+        style: str = "cinematic",
+        reference_indices: list = None
+    ) -> str:
         """
         生成角色头像/定妆照
         """
@@ -323,6 +331,14 @@ class MovieCharacterService(BaseService):
             base_url=api_key.base_url
         )
         
+        # 根据索引获取参考图URL（参考关键帧生成的方式）
+        reference_image_urls = []
+        if reference_indices and char.reference_images:
+            for idx in reference_indices:
+                if 0 <= idx < len(char.reference_images):
+                    reference_image_urls.append(char.reference_images[idx])
+                    logger.info(f"添加参考图 [{idx}]: {char.reference_images[idx]}")
+        
         try:
             # 直接使用前端传递的提示词(用户已微调过的三视图提示词)
             logger.info(f"收到的prompt参数: {prompt[:200] if prompt else 'None'}...")
@@ -334,11 +350,20 @@ class MovieCharacterService(BaseService):
             
             # 调用生图模型
             logger.info(f"生成角色头像提示词: {enhanced_prompt[:200]}...")
+            
+            # 准备生成参数
+            generate_kwargs = {
+                "prompt": enhanced_prompt,
+                "model": model
+            }
+            
+            # 如果有参考图，添加到参数中（参考关键帧生成的方式）
+            if reference_image_urls:
+                generate_kwargs["reference_images"] = reference_image_urls
+                logger.info(f"使用 {len(reference_image_urls)} 张参考图")
+            
             result = await retry_with_backoff(
-                lambda: image_provider.generate_image(
-                    prompt=enhanced_prompt,
-                    model=model
-                )
+                lambda: image_provider.generate_image(**generate_kwargs)
             )
             
             # 5. 提取并上传图片（使用通用工具函数）
@@ -352,12 +377,6 @@ class MovieCharacterService(BaseService):
 
             # 6. 更新角色信息
             char.avatar_url = object_key
-            
-            # 更新参考图列表
-            refs = list(char.reference_images) if char.reference_images else []
-            if object_key not in refs:
-                refs.insert(0, object_key)
-                char.reference_images = refs
             
             # 7. 创建生成历史记录
             from src.services.generation_history_service import GenerationHistoryService
