@@ -287,11 +287,11 @@ class APIKeyService(BaseService):
         # Custom provider - 返回预定义模型列表
         elif provider == 'custom':
             if model_type == "image":
-                return ['gemini-3-pro-image-preview', 'dall-e-3', 'doubao-seedream-3-0-t2i-250415', 'doubao-seedream-4-0-250828', 'sora_image']
+                return ['gemini-3-pro-image-preview']
             elif model_type == "audio":
                 return ['gpt-4o-mini-tts', 'tts-1']
             elif model_type == "video":
-                return ['veo3.1-components','veo_3_1-fast', 'veo_3_1']
+                return ['veo3.1-components','veo3.1-fast-components','veo3.1-4k']
             else:  # text
                 return ['gemini-3-pro-preview','gemini-3-flash-preview', 'deepseek-chat', 'deepseek-r1']
         
