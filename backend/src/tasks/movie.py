@@ -104,13 +104,29 @@ async def movie_extract_characters(db_session: AsyncSession, self, chapter_id: s
     name="movie.generate_character_avatar"
 )
 @async_task_decorator
-async def movie_generate_character_avatar(db_session: AsyncSession, self, character_id: str, api_key_id: str, model: str = None, prompt: str = None, style: str = "cinematic"):
+async def movie_generate_character_avatar(
+    db_session: AsyncSession, 
+    self, 
+    character_id: str, 
+    api_key_id: str, 
+    model: str = None, 
+    prompt: str = None, 
+    style: str = "cinematic",
+    reference_indices: list = None
+):
     """生成角色头像的 Celery 任务"""
     from src.services.movie_character_service import MovieCharacterService
-    logger.info(f"Celery任务开始: movie_generate_character_avatar (character_id={character_id})")
+    logger.info(f"Celery任务开始: movie_generate_character_avatar (character_id={character_id}, reference_indices={reference_indices})")
     
     service = MovieCharacterService(db_session)
-    url = await service.generate_character_avatar(character_id, api_key_id, model, prompt, style)
+    url = await service.generate_character_avatar(
+        character_id, 
+        api_key_id, 
+        model, 
+        prompt, 
+        style,
+        reference_indices
+    )
     
     logger.info(f"Celery任务完成: movie_generate_character_avatar")
     return {"avatar_url": url}

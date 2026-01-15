@@ -25,7 +25,22 @@ export const movieService = {
      * 生成角色形象
      */
     generateCharacterAvatar(characterId, data) {
-        return post(`/movie/characters/${characterId}/generate`, data)
+        const formData = new FormData()
+        formData.append('api_key_id', data.api_key_id)
+        if (data.model) formData.append('model', data.model)
+        if (data.prompt) formData.append('prompt', data.prompt)
+        if (data.style) formData.append('style', data.style)
+
+        // 发送选中的参考图索引（逗号分隔）
+        if (data.selected_reference_indices && data.selected_reference_indices.length > 0) {
+            formData.append('selected_reference_indices', data.selected_reference_indices.join(','))
+        }
+
+        return api.post(`/movie/characters/${characterId}/generate`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
     },
 
     /**
@@ -168,6 +183,29 @@ export const movieService = {
      */
     deleteTransition(transitionId) {
         return del(`/movie/transitions/${transitionId}`)
+    },
+
+    // ==================== 参考图管理 ====================
+
+    /**
+     * 上传角色参考图
+     */
+    uploadReferenceImage(characterId, file) {
+        const formData = new FormData()
+        formData.append('file', file)
+
+        return api.post(`/movie/characters/${characterId}/reference-images`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+    },
+
+    /**
+     * 删除角色参考图
+     */
+    deleteReferenceImage(characterId, imageIndex) {
+        return del(`/movie/characters/${characterId}/reference-images/${imageIndex}`)
     }
 }
 
