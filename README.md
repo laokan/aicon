@@ -1,6 +1,29 @@
 # AICG 内容分发平台
 
 > 🎬 **AI驱动的智能内容创作与分发平台** - 从文字到视频，一站式AI内容生产解决方案
+>
+> 🚀 **官方在线站点现已上线内测：[https://aicon-studio.com/](https://aicon-studio.com/)**
+
+---
+
+## 📅 更新日志
+
+### [2026-01-15]
+- 🚀 **官方在线站点上线**: AICON 商业项目版本已上线内测，访问 [aicon-studio.com](https://aicon-studio.com/) 立即体验。
+- 🎭 **角色参考图功能**: 支持上传参考图，让 AI 精准控制生成你喜欢的任何角色，角色一致性再进化。
+- 🖼️ **九宫格关键帧**: 全新的关键帧编辑体验，更直观、更高效地把控分镜。
+- 📺 **高级模型支持**: 新增 VEO3.1 4K 超高清模型支持，带来顶级的影视画质。
+- 📖 **文档更新**: 完善了 README 说明，增加了更新日志和交流群组。
+
+---
+
+## 👥 交流与支持
+
+扫码加入 **AICON 内测交流群**, 获取最新动态、功能首发及技术支持。**我们诚邀各路创作者加入，共同打造最强 AI 电影工具！**
+
+<img src="docs/media/qr.jpg" width="200" alt="内测交流群">
+
+---
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
