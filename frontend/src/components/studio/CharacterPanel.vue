@@ -304,8 +304,8 @@ const handleHistorySelected = async (history) => {
   emit('refresh')
 }
 
-// 监听API Key变化，自动加载模型列表
-watch(() => formData.value.apiKeyId, async (newKeyId) => {
+// 监听API Key或对话框类型变化，自动加载模型列表
+watch([() => formData.value.apiKeyId, () => dialogType.value], async ([newKeyId, newType]) => {
   if (!newKeyId) {
     modelOptions.value = []
     formData.value.model = ''
@@ -317,7 +317,7 @@ watch(() => formData.value.apiKeyId, async (newKeyId) => {
     // 根据对话框类型选择模型类型
     // extract = 提取角色 = 文本模型
     // generate/regenerate/batch = 生成形象 = 图片模型
-    const modelType = dialogType.value === 'extract' ? 'text' : 'image'
+    const modelType = newType === 'extract' ? 'text' : 'image'
     const models = await api.get(`/api-keys/${newKeyId}/models?type=${modelType}`)
     modelOptions.value = models || []
     if (modelOptions.value.length > 0) {
