@@ -249,7 +249,7 @@ class APIKeyService(BaseService):
         Args:
             key_id: API密钥ID
             user_id: 用户ID
-            model_type: 模型类型 (text/image/video)
+            model_type: 模型类型 (text/image/video/audio)
             
         Returns:
             List[str]: 模型列表
@@ -267,16 +267,53 @@ class APIKeyService(BaseService):
                 decrypted_key = api_key.get_api_key()
                 
                 async with httpx.AsyncClient() as client:
+                    # SiliconFlow API docs suggest query param 'type' or 'sub_type' for filtering
+                    # But to be safe, we fetch all and filter manually
                     response = await client.get(
                         "https://api.siliconflow.cn/v1/models",
                         headers={"Authorization": f"Bearer {decrypted_key}"},
-                        params={"type": model_type},
                         timeout=10.0
                     )
                     
                     if response.status_code == 200:
                         data = response.json()
-                        return [model["id"] for model in data.get("data", [])]
+                        models = data.get("data", [])
+                        
+                        # 额外进行一次客户端代码过滤，确保类型一致
+                        filtered_models = []
+                        for m in models:
+                            m_id = m.get("id", "")
+                            # SiliconFlow models have 'type' or 'sub_type' field
+                            m_type = (m.get("type") or m.get("sub_type") or "").lower()
+                            
+                            if model_type == "text":
+                                if m_type in ["chat", "text", "llm"]:
+                                    filtered_models.append(m_id)
+                            elif model_type == "image":
+                                if m_type in ["image", "text-to-image"]:
+                                    filtered_models.append(m_id)
+                            elif model_type == "video":
+                                if m_type in ["video", "text-to-video"]:
+                                    filtered_models.append(m_id)
+                            elif model_type == "audio":
+                                if m_type in ["audio", "text-to-speech", "tts"]:
+                                    filtered_models.append(m_id)
+                            else:
+                                filtered_models.append(m_id)
+                        
+                        # 如果没有通过类型过滤出结果，且 model_type 为 image/video，
+                        # 尝试通过 ID 关键字匹配作为兜底
+                        if not filtered_models and models:
+                            if model_type == "image":
+                                filtered_models = [m["id"] for m in models if "flux" in m["id"].lower() or "sd" in m["id"].lower() or "kolors" in m["id"].lower()]
+                            elif model_type == "video":
+                                filtered_models = [m["id"] for m in models if "video" in m["id"].lower() or "svd" in m["id"].lower()]
+                        
+                        # 如果还是没有，返回所有（原行为）或前几个
+                        if not filtered_models:
+                            return [m["id"] for m in models[:20]]
+                             
+                        return filtered_models
                     else:
                         logger.error(f"获取SiliconFlow模型失败: {response.text}")
                         return []
@@ -291,9 +328,37 @@ class APIKeyService(BaseService):
             elif model_type == "audio":
                 return ['gpt-4o-mini-tts', 'tts-1']
             elif model_type == "video":
-                return ['veo3.1-components','veo3.1-fast-components','veo3.1-4k']
+                return [
+                    'veo_3_1',
+                    'veo_3_1-4K',
+                    'veo_3_1-components',
+                    'veo_3_1-components-4K',
+                    'veo_3_1-fast',
+                    'veo_3_1-fast-4K',
+                    'veo_3_1-fast-components',
+                    'veo_3_1-fast-components-4K'
+                ]
             else:  # text
-                return ['gemini-3-pro-preview','gemini-3-flash-preview', 'deepseek-chat', 'deepseek-r1']
+                return ['gemini-3-pro-preview','gemini-3-flash-preview', 'gpt-4o', 'gpt-4o-mini']
+        
+        # Other provider defaults
+        elif provider == 'openai':
+            if model_type == "image":
+                return ['dall-e-3', 'dall-e-2']
+            elif model_type == "text":
+                return ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo']
+            elif model_type == "audio":
+                return ['tts-1', 'tts-1-hd', 'whisper-1']
+        
+        elif provider == 'deepseek':
+            if model_type == "text":
+                return ['deepseek-chat', 'deepseek-reasoner']
+
+        elif provider == 'google':
+            if model_type == "text":
+                return ['gemini-1.5-pro', 'gemini-1.5-flash']
+            elif model_type == "image":
+                return ['imagen-3']
         
         return []
 
